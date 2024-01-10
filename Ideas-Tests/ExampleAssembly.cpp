@@ -18,14 +18,7 @@ extern "C"
 
 	}
 
-	// Int32 takes 4 bytes for our current purposes
-	// it is a value type so doesn't need pointer to its actual type for vtable-like capabilities
-	struct ns1_System_Int32_sizeof
-	{
-		unsigned char bytebuf[4];
-	};
-
-	ns1_System_Int32_sizeof Program_Main()
+	int Program_Main()
 	{
 		// void (*ns1_System_Console_WriteLine)(void*) = (void (*)(void*)) ULRImpl->GetMethod("System", "Console", "WriteLine", "void;[System]String", MethodFlags::PUBLIC | MethodFlags::STATIC);
 		// void* (*ns1_System_String_ctor)(void*) = (void* (*)(void*)) ULRImpl->GetMethod("System", "String", ".ctor", "[$native]char[]", MethodFlags::CTOR);
@@ -37,16 +30,7 @@ extern "C"
 
 		std::cout << "Hello from ExampleAssembly" << std::endl;
 
-		int _tmpnative = 0;	
-		ns1_System_Int32_sizeof _tmp;
-
-		std::copy(
-			reinterpret_cast<unsigned char*>(&_tmpnative), 
-			reinterpret_cast<unsigned char*>(&_tmpnative)+sizeof(_tmpnative),
-			_tmp.bytebuf
-		);
-
-		return _tmp;
+		return 0;
 	}
 
 	// pc -> public class

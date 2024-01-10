@@ -2,7 +2,7 @@
 
 namespace ULR
 {
-	Assembly::Assembly(std::string name, std::string meta, void** addr)
+	Assembly::Assembly(char* name, char* meta, void** addr)
 	{
 		this->name = name;
 		this->meta = meta;

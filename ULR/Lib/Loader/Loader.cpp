@@ -165,7 +165,7 @@ namespace ULR::Loader
 
 			i++; // skip semicolon
 
-			std::shared_ptr<Type> type = assembly->types[(ns_name+type_name)];
+			std::shared_ptr<Type> type = assembly->types[(ns_name+type_name).c_str()];
 
 			/* Parse Members */
 
@@ -210,7 +210,7 @@ namespace ULR::Loader
 
 						i++; // skip `;`
 
-						type->AddStaticMember(MemberInfo(MemberType::Ctor, ".ctor", true, addr[nummember], attrs));
+						type->AddStaticMember(std::make_shared<MethodInfo>(MemberType::Ctor, ".ctor", true, addr[nummember], attrs));
 						continue;
 					}
 
@@ -289,9 +289,9 @@ namespace ULR::Loader
 
 						i++; // skip `;`
 
-						type->AddStaticMember(MemberInfo(MemberType::Method, func_name, true, addr[nummember], attrs));
+						type->AddStaticMember(std::make_shared<MethodInfo>(MemberType::Method, func_name, true, addr[nummember], attrs));
 						
-						assembly->entry = (sizeof_Int32 (*)()) addr[nummember];
+						assembly->entry = (int (*)()) addr[nummember];
 						
 						continue;
 					}
@@ -376,8 +376,8 @@ namespace ULR::Loader
 
 				i++; // skip `;`
 
-				if (attrs & Modifiers::Static) type->AddStaticMember(MemberInfo(MemberType::Method, func_name, true, addr[nummember], attrs));
-				else type->AddInstanceMember(MemberInfo(MemberType::Method, func_name, false, addr[nummember], attrs));
+				if (attrs & Modifiers::Static) type->AddStaticMember(std::make_shared<MethodInfo>(MemberType::Method, func_name, true, addr[nummember], attrs));
+				else type->AddInstanceMember(std::make_shared<MethodInfo>(MemberType::Method, func_name, false, addr[nummember], attrs));
 			}
 
 			i++; // skip newline
@@ -420,7 +420,7 @@ namespace ULR::Loader
 		{
 			std::shared_ptr<Assembly> assembly = entry.second;
 
-			if (assembly->types.count(qual_name) == 1) return assembly->types[qual_name];
+			if (assembly->types.count(qual_name.c_str()) == 1) return assembly->types[qual_name.c_str()];
 		}
 
 		throw std::runtime_error("Type not found");

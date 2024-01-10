@@ -4,7 +4,7 @@ namespace ULR
 {
 	MemberInfo::MemberInfo() { }
 
-	MemberInfo::MemberInfo(MemberType decl_type, std::string name, bool is_static, void* offset, int attrs)
+	MemberInfo::MemberInfo(MemberType decl_type, char* name, bool is_static, void* offset, int attrs)
 	{
 		this->decl_type = decl_type;
 		this->name = name;

@@ -8,11 +8,11 @@
 
 namespace ULR::Loader
 {
-	extern std::map<std::string, std::shared_ptr<Assembly>> ReadAssemblies;
-	extern std::map<std::string, std::shared_ptr<Assembly>> LoadedAssemblies;
+	extern std::map<char*, std::shared_ptr<Assembly>, cmp_chr_ptr> ReadAssemblies;
+	extern std::map<char*, std::shared_ptr<Assembly>, cmp_chr_ptr> LoadedAssemblies;
 
-	HMODULE ReadAssembly(std::string dll);
-	std::shared_ptr<Assembly> LoadAssembly(std::string dll);
-	std::shared_ptr<Type> GetType(std::string qual_name);
-	std::vector<std::shared_ptr<Type>> ParseArgs(size_t* i, std::string meta);
+	HMODULE ReadAssembly(char* dll);
+	std::shared_ptr<Assembly> LoadAssembly(char* dll);
+	std::shared_ptr<Type> GetType(char* qual_name);
+	std::vector<std::shared_ptr<Type>> ParseArgs(size_t* i, char* meta);
 }

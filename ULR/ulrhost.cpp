@@ -9,7 +9,7 @@ using namespace ULR;
 
 int main(int argc, char* argv[])
 {
-	const char* assembly_name = argv[1];
+	char* assembly_name = argv[1];
 
 	HMODULE mod = Loader::ReadAssembly(assembly_name);
 
@@ -20,11 +20,9 @@ int main(int argc, char* argv[])
 		throw std::runtime_error("No entry point found.");
 	}
 	
-	sizeof_Int32 retcode = main->entry();
-
-	int* ret = reinterpret_cast<int*>(retcode.buf);
+	int retcode = main->entry();
 
 	FreeLibrary(mod);
 
-	return *ret;
+	return retcode;
 }

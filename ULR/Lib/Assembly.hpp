@@ -2,6 +2,7 @@
 #include <memory>
 #include <vector>
 #include <string>
+#include <stdexcept>
 #include <cstring>
 
 #pragma once
@@ -36,57 +37,60 @@ namespace ULR
 		Sealed = 1 << 9
 	};
 
-	// struct cmp_chr_ptr
-	// {
-	// 	bool operator()(char const *a, char const *b) const
-	// 	{
-	// 		return strcmp(a, b) < 0;
-	// 	}
-	// };
+	struct cmp_chr_ptr
+	{
+		bool operator()(char const *a, char const *b) const
+		{
+			return strcmp(a, b) < 0;
+		}
+	};
 
 	class MemberInfo
 	{
 		public:
 			MemberType decl_type;
 			bool is_static;
-			std::string name;
+			char* name;
 			void* offset;
 			int attrs;
 
 			MemberInfo();
-			MemberInfo(MemberType decl_type, std::string name, bool is_static, void* offset, int attrs);
+			MemberInfo(MemberType decl_type, char* name, bool is_static, void* offset, int attrs);
+	};
+
+	class MethodInfo : public MemberInfo
+	{
+		public:
+			std::vector<char*> sigmeta;
+			std::vector<void*> offsets;
+			
+			MethodInfo(MemberType decl_type, char* name, bool is_static, void* offset, int attrs);
 	};
 
 	class Type
 	{
 		public:
 			TypeType decl_type;
-			std::string name;
+			char* name;
 			int attrs;
-			std::map<std::string, MemberInfo> static_attrs;
-			std::map<std::string, MemberInfo> inst_attrs;
+			std::map<char*, std::shared_ptr<MemberInfo>, cmp_chr_ptr> static_attrs;
+			std::map<char*, std::shared_ptr<MemberInfo>, cmp_chr_ptr> inst_attrs;
 
-			Type(TypeType decl_type, std::string name, int attrs);
+			Type(TypeType decl_type, char* name, int attrs);
 
-			void AddStaticMember(MemberInfo member);
-			void AddInstanceMember(MemberInfo member);
-	};
-
-	struct sizeof_Int32
-	{
-		public:
-			unsigned char buf[4];
+			void AddStaticMember(std::shared_ptr<MemberInfo> member);
+			void AddInstanceMember(std::shared_ptr<MemberInfo> member);
 	};
 
 	class Assembly
 	{
 		public:
-			std::string name;
-			std::string meta;
+			char* name;
+			char* meta;
 			void** addr;
-			sizeof_Int32 (*entry)() = NULL;
-			std::map<std::string, std::shared_ptr<Type>> types;
+			int (*entry)() = NULL;
+			std::map<const char*, std::shared_ptr<Type>> types;
 
-			Assembly(std::string name, std::string meta, void** addr);
+			Assembly(char* name, char* meta, void** addr);
 	};
 }

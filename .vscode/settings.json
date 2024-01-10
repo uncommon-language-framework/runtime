@@ -1,0 +1,15 @@
+{
+	"files.associations": {
+		"*.pog": "pogscript",
+		"*.pyx": "python",
+		"*.uts": "javascript",
+		"*.pydict": "python",
+		"*.pg": "html",
+		"*.pgx": "xml",
+		"*.cb": "csharp",
+		"xstring": "cpp",
+		"xtree": "cpp",
+		"memory": "cpp",
+		"map": "cpp"
+	}
+}
