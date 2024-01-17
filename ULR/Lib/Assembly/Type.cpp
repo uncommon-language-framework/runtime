@@ -19,4 +19,19 @@ namespace ULR
 	{
 		inst_attrs[member->name] = member;
 	}
+
+	Type::~Type()
+	{
+		free(name);
+		
+		for (auto& entry : static_attrs)
+		{
+			delete entry.second;
+		}
+
+		for (auto& entry : inst_attrs)
+		{
+			delete entry.second;
+		}
+	}
 }

@@ -10,4 +10,15 @@ namespace ULR
 		this->handle = handle;
 		this->metalen = metalen;
 	}
+
+	Assembly::~Assembly()
+	{
+		free(name);
+		FreeLibrary(handle);
+		
+		for (auto &entry : types)
+		{
+			delete entry.second;
+		}
+	}
 }

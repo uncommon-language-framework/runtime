@@ -63,8 +63,8 @@ namespace ULR
 			char* name;
 			int attrs;
 
-			MemberInfo();
-			MemberInfo(MemberType decl_type, char* name, bool is_static, int attrs);
+			// MemberInfo(MemberType decl_type, char* name, bool is_static, int attrs);
+			// ~MemberInfo();
 	};
 
 	class MethodInfo : public MemberInfo
@@ -78,6 +78,31 @@ namespace ULR
 			MemberType decl_type = MemberType::Method;
 			
 			MethodInfo(char* name, bool is_static, std::vector<Type*> signature, void* offset, int attrs);
+			~MethodInfo();
+	};
+
+	class ConstructorInfo : public MemberInfo
+	{
+		public:
+			/* `signature` where
+					<argtype> <argtype>...
+					(no rettype) */
+			std::vector<Type*> signature;
+			void* offset;
+			bool is_static = true;
+			MemberType decl_type = MemberType::Ctor;
+			
+			ConstructorInfo(std::vector<Type*> signature, void* offset, int attrs);
+	};
+
+	class DestructorInfo : public MemberInfo
+	{
+		public:
+			void* offset;
+			bool is_static = false;
+			MemberType decl_type = MemberType::Dtor;
+			
+			DestructorInfo(void* offset, int attrs);
 	};
 
 	class FieldInfo : public MemberInfo
@@ -87,6 +112,7 @@ namespace ULR
 			MemberType decl_type = MemberType::Field;
 			
 			FieldInfo(char* name, bool is_static, void* offset, int attrs);
+			~FieldInfo();
 	};
 
 	class PropertyInfo : public MemberInfo
@@ -97,6 +123,7 @@ namespace ULR
 			MemberType decl_type = MemberType::Property;
 
 			PropertyInfo(char* name, bool is_static, MethodInfo* getter, MethodInfo* setter, int attrs);
+			~PropertyInfo();
 	};
 
 	class Type
@@ -109,6 +136,7 @@ namespace ULR
 			std::map<char*, MemberInfo*, cmp_chr_ptr> inst_attrs;
 
 			Type(TypeType decl_type, char* name, int attrs);
+			~Type();
 
 			void AddStaticMember(MemberInfo* member);
 			void AddInstanceMember(MemberInfo* member);
@@ -126,5 +154,6 @@ namespace ULR
 			std::map<const char*, Type*> types;
 
 			Assembly(char* name, char* meta, size_t metalen, void** addr, HMODULE handle);
+			~Assembly();
 	};
 }

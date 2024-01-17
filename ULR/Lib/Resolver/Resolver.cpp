@@ -7,29 +7,29 @@ namespace ULR::Resolver
 		this->assemblies = assemblies;
 	}
 
-	void** ULRAPIImpl::GetMember(char full_qual_typename[], char name[], int flags)
-	{
-		Type* type = (Type*) GetType(full_qual_typename);
+	// void** ULRAPIImpl::GetMember(void* Type, char name[], int flags)
+	// {
+	// 	// Type* type = (Type*) GetType(full_qual_typename);
 
 
-	}
+	// }
 
-	void** ULRAPIImpl::GetType(char full_qual_typename[])
+	Type* ULRAPIImpl::GetType(char full_qual_typename[])
 	{
 		for (auto& entry : *assemblies) // optimize this somehow
 		{
 			auto& assembly = entry.second;
 
-			if (assembly->types.count(full_qual_typename) != 0) return assembly->types[full_qual_typename].get();
+			if (assembly->types.count(full_qual_typename) != 0) return assembly->types[full_qual_typename];
 		}
 	}
 
-	void* ULRAPIImpl::GetType(char full_qual_typename[], char assembly_hint[])
+	Type* ULRAPIImpl::GetType(char full_qual_typename[], char assembly_hint[])
 	{
 		if (assemblies->count(assembly_hint) == 0) return nullptr;
 
 		auto& assembly = (*assemblies)[assembly_hint];
 		 
-		if (assembly->types.count(full_qual_typename) != 0) return assembly->types[full_qual_typename].get();
+		if (assembly->types.count(full_qual_typename) != 0) return assembly->types[full_qual_typename];
 	}
 }

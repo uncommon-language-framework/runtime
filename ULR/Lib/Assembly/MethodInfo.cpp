@@ -10,4 +10,9 @@ namespace ULR
 		this->attrs = attrs;
 		this->signature = signature;
 	}
+
+	MethodInfo::~MethodInfo()
+	{
+		free(name);
+	}
 }

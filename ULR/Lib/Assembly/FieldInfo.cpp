@@ -9,4 +9,9 @@ namespace ULR
 		this->offset = offset;
 		this->attrs = attrs;
 	}
+
+	FieldInfo::~FieldInfo()
+	{
+		free(name);
+	}
 }

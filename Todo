@@ -1,1 +1,3 @@
-- Eradicate shared ptrs (since all meta is destroyed at ulrhost exit anyways [we don't need shared ptr to keep track of this])
+- do memory/garbage cleanup on exit
+- impl garbage collector
+- make sure all name strings are allocated on the heap

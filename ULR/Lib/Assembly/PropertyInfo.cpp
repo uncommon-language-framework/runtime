@@ -10,4 +10,11 @@ namespace ULR
 		this->setter = setter;
 		this->attrs = attrs;
 	}
+
+	PropertyInfo::~PropertyInfo()
+	{
+		free(name);
+
+		delete getter, setter;
+	}
 }

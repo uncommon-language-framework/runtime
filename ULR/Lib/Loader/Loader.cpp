@@ -12,7 +12,7 @@ namespace ULR::Loader
 
 	HMODULE ReadAssembly(char* dll)
 	{
-		HMODULE mod = LoadLibrary(dll.c_str());
+		HMODULE mod = LoadLibrary((LPCWSTR) dll);
 
 		char* meta = (char*) GetProcAddress(mod, "ulrmeta");
 		void** addr = (void**) GetProcAddress(mod, "ulraddr");
@@ -104,7 +104,7 @@ namespace ULR::Loader
 
 			size_t size = std::stoull(size_str);
 
-			Type* type = new Type(class_type, (ns_name+type_name), modflags);
+			Type* type = new Type(class_type, strdup((ns_name+type_name).c_str()), modflags);
 
 			/* Skip Members */
 
@@ -177,7 +177,7 @@ namespace ULR::Loader
 				{
 					if (strncmp(&meta[i], ".ctor ", 6) == 0) // constructor
 					{
-						int attrs = Modifiers::Private;
+						int attrs = Modifiers::Private | Modifiers::Static;
 
 						i+=6;
 
@@ -212,7 +212,7 @@ namespace ULR::Loader
 
 						i++; // skip `;`
 
-						type->AddStaticMember(new MethodInfo(MemberType::Ctor, ".ctor", true, addr[nummember], attrs));
+						type->AddStaticMember(new ConstructorInfo(args, addr[nummember], attrs));
 						continue;
 					}
 
@@ -287,11 +287,13 @@ namespace ULR::Loader
 						
 						i++; // skip open paren
 
-						std::vector<Type*> args = ParseArgs(&i, meta);
+						std::vector<Type*> sig = ParseArgs(&i, meta);
+
+						sig.emplace_back(GetType(full_rettype.data()));
 
 						i++; // skip `;`
 
-						type->AddStaticMember(new MethodInfo(MemberType::Method, func_name, true, addr[nummember], attrs));
+						type->AddStaticMember(new MethodInfo(strdup(func_name.c_str()), true, sig, addr[nummember], attrs));
 						
 						assembly->entry = (int (*)()) addr[nummember];
 						
@@ -374,12 +376,14 @@ namespace ULR::Loader
 				
 				i++; // skip open paren
 
-				std::vector<Type*> args = ParseArgs(&i, meta);
+				std::vector<Type*> sig = ParseArgs(&i, meta);
+
+				sig.emplace_back(GetType(full_rettype.data()));
 
 				i++; // skip `;`
 
-				if (attrs & Modifiers::Static) type->AddStaticMember(new MethodInfo(MemberType::Method, func_name, true, addr[nummember], attrs));
-				else type->AddInstanceMember(new MethodInfo(MemberType::Method, func_name, false, addr[nummember], attrs));
+				if (attrs & Modifiers::Static) type->AddStaticMember(new MethodInfo(strdup(func_name.c_str()), true, sig, addr[nummember], attrs));
+				else type->AddInstanceMember(new MethodInfo(strdup(func_name.c_str()), false, sig, addr[nummember], attrs));
 			}
 
 			i++; // skip newline
@@ -405,7 +409,7 @@ namespace ULR::Loader
 				(*i)++;
 			}
 
-			argtypes.emplace_back(GetType(std::string(&meta[start], (*i)-start)));
+			argtypes.emplace_back(GetType(std::string(&meta[start], (*i)-start).data()));
 
 			if (meta[*i] == ',') (*i)++;
 
@@ -416,13 +420,13 @@ namespace ULR::Loader
 		return argtypes;
 	}
 
-	Type* GetType(std::string qual_name) // note that this will not work since types could accept an inst of themselves or their own asm as an arg, since the types are ptrs it would work if each type is analyzed by name first and then later fully loaded (same as lazy loading strategy)
+	Type* GetType(char* qual_name) // note that this will not work since types could accept an inst of themselves or their own asm as an arg, since the types are ptrs it would work if each type is analyzed by name first and then later fully loaded (same as lazy loading strategy)
 	{
 		for (const auto& entry: ReadAssemblies)
 		{
 			Assembly* assembly = entry.second;
 
-			if (assembly->types.count(qual_name.c_str()) == 1) return assembly->types[qual_name.c_str()];
+			if (assembly->types.count(qual_name) == 1) return assembly->types[qual_name];
 		}
 
 		throw std::runtime_error("Type not found");
