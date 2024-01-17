@@ -7,20 +7,22 @@
 
 namespace ULR::Loader
 {
-	std::map<std::string, std::shared_ptr<Assembly>> ReadAssemblies;
-	std::map<std::string, std::shared_ptr<Assembly>> LoadedAssemblies;
+	std::map<char*, Assembly*, cmp_chr_ptr> ReadAssemblies;
+	std::map<char*, Assembly*, cmp_chr_ptr> LoadedAssemblies;
 
-	HMODULE ReadAssembly(std::string dll)
+	HMODULE ReadAssembly(char* dll)
 	{
 		HMODULE mod = LoadLibrary(dll.c_str());
 
-		std::string meta = std::string((char*) GetProcAddress(mod, "ulrmeta"));
+		char* meta = (char*) GetProcAddress(mod, "ulrmeta");
 		void** addr = (void**) GetProcAddress(mod, "ulraddr");
 
-		std::shared_ptr<Assembly> assembly = std::make_shared<Assembly>(dll, meta, addr);
+		size_t metalen = strlen(meta);
+
+		Assembly* assembly = new Assembly(dll, meta, metalen, addr, mod);
 
 		size_t i = 0;
-		size_t metalen = meta.length();
+		size_t metalen = strlen(meta);
 
 		while (i < metalen)
 		{
@@ -102,7 +104,7 @@ namespace ULR::Loader
 
 			size_t size = std::stoull(size_str);
 
-			std::shared_ptr<Type> type = std::make_shared<Type>(class_type, (ns_name+type_name), modflags);
+			Type* type = new Type(class_type, (ns_name+type_name), modflags);
 
 			/* Skip Members */
 
@@ -118,18 +120,18 @@ namespace ULR::Loader
 		return mod;
 	}
 
-	std::shared_ptr<Assembly> LoadAssembly(std::string dll)
+	Assembly* LoadAssembly(char* dll)
 	{
 		if (LoadedAssemblies.count(dll) == 1) return LoadedAssemblies[dll];
 		if (ReadAssemblies.count(dll) == 0) throw std::runtime_error(std::string("Attempted to load assembly '")+dll+std::string("' without reading it first"));
 
-		std::shared_ptr<Assembly> assembly = ReadAssemblies[dll];
+		Assembly* assembly = ReadAssemblies[dll];
 
-		std::string meta = assembly->meta;
+		char* meta = assembly->meta;
 		void** addr = assembly->addr;
 
 		size_t i = 0;
-		size_t metalen = meta.length();
+		size_t metalen = assembly->metalen;
 		size_t nummember = -1;
 
 		while (i < metalen)
@@ -165,7 +167,7 @@ namespace ULR::Loader
 
 			i++; // skip semicolon
 
-			std::shared_ptr<Type> type = assembly->types[(ns_name+type_name).c_str()];
+			Type* type = assembly->types[(ns_name+type_name).c_str()];
 
 			/* Parse Members */
 
@@ -206,11 +208,11 @@ namespace ULR::Loader
 
 						i++; // skip open paren
 
-						std::vector<std::shared_ptr<Type>> args = ParseArgs(&i, meta);
+						std::vector<Type*> args = ParseArgs(&i, meta);
 
 						i++; // skip `;`
 
-						type->AddStaticMember(std::make_shared<MethodInfo>(MemberType::Ctor, ".ctor", true, addr[nummember], attrs));
+						type->AddStaticMember(new MethodInfo(MemberType::Ctor, ".ctor", true, addr[nummember], attrs));
 						continue;
 					}
 
@@ -285,11 +287,11 @@ namespace ULR::Loader
 						
 						i++; // skip open paren
 
-						std::vector<std::shared_ptr<Type>> args = ParseArgs(&i, meta);
+						std::vector<Type*> args = ParseArgs(&i, meta);
 
 						i++; // skip `;`
 
-						type->AddStaticMember(std::make_shared<MethodInfo>(MemberType::Method, func_name, true, addr[nummember], attrs));
+						type->AddStaticMember(new MethodInfo(MemberType::Method, func_name, true, addr[nummember], attrs));
 						
 						assembly->entry = (int (*)()) addr[nummember];
 						
@@ -372,12 +374,12 @@ namespace ULR::Loader
 				
 				i++; // skip open paren
 
-				std::vector<std::shared_ptr<Type>> args = ParseArgs(&i, meta);
+				std::vector<Type*> args = ParseArgs(&i, meta);
 
 				i++; // skip `;`
 
-				if (attrs & Modifiers::Static) type->AddStaticMember(std::make_shared<MethodInfo>(MemberType::Method, func_name, true, addr[nummember], attrs));
-				else type->AddInstanceMember(std::make_shared<MethodInfo>(MemberType::Method, func_name, false, addr[nummember], attrs));
+				if (attrs & Modifiers::Static) type->AddStaticMember(new MethodInfo(MemberType::Method, func_name, true, addr[nummember], attrs));
+				else type->AddInstanceMember(new MethodInfo(MemberType::Method, func_name, false, addr[nummember], attrs));
 			}
 
 			i++; // skip newline
@@ -390,9 +392,9 @@ namespace ULR::Loader
 		return assembly;
 	}
 
-	std::vector<std::shared_ptr<Type>> ParseArgs(size_t* i, std::string meta)
+	std::vector<Type*> ParseArgs(size_t* i, std::string meta)
 	{
-		std::vector<std::shared_ptr<Type>> argtypes;
+		std::vector<Type*> argtypes;
 
 		while (meta[*i] != ')')
 		{
@@ -414,11 +416,11 @@ namespace ULR::Loader
 		return argtypes;
 	}
 
-	std::shared_ptr<Type> GetType(std::string qual_name) // note that this will not work since types could accept an inst of themselves or their own asm as an arg, since the types are ptrs it would work if each type is analyzed by name first and then later fully loaded (same as lazy loading strategy)
+	Type* GetType(std::string qual_name) // note that this will not work since types could accept an inst of themselves or their own asm as an arg, since the types are ptrs it would work if each type is analyzed by name first and then later fully loaded (same as lazy loading strategy)
 	{
 		for (const auto& entry: ReadAssemblies)
 		{
-			std::shared_ptr<Assembly> assembly = entry.second;
+			Assembly* assembly = entry.second;
 
 			if (assembly->types.count(qual_name.c_str()) == 1) return assembly->types[qual_name.c_str()];
 		}

@@ -1,3 +1,4 @@
+#include <Windows.h>
 #include <map>
 #include <memory>
 #include <vector>
@@ -11,15 +12,24 @@ namespace ULR
 {
 	enum TypeType
 	{
-		Class = 0
+		Class,
+		Struct,
+		ReadonlyStruct,
+		RefStruct,
+		ReadonlyRefStruct,
+		StaticClass,
+		AbstractClass,
+		FinalClass,
+		Record
 	};
 
 	enum MemberType
 	{
-		Method = 0,
-		Field = 1,
-		Ctor = 2,
-		Dtor = 3
+		Method,
+		Field,
+		Ctor,
+		Dtor,
+		Property
 	};
 
 	enum Modifiers
@@ -51,20 +61,42 @@ namespace ULR
 			MemberType decl_type;
 			bool is_static;
 			char* name;
-			void* offset;
 			int attrs;
 
 			MemberInfo();
-			MemberInfo(MemberType decl_type, char* name, bool is_static, void* offset, int attrs);
+			MemberInfo(MemberType decl_type, char* name, bool is_static, int attrs);
 	};
 
 	class MethodInfo : public MemberInfo
 	{
 		public:
-			std::vector<char*> sigmeta;
-			std::vector<void*> offsets;
+			/* `signature` where
+					<argtype> <argtype> <rettype>
+					(rettype is the last type element) */
+			std::vector<Type*> signature;
+			void* offset;
+			MemberType decl_type = MemberType::Method;
 			
-			MethodInfo(MemberType decl_type, char* name, bool is_static, void* offset, int attrs);
+			MethodInfo(char* name, bool is_static, std::vector<Type*> signature, void* offset, int attrs);
+	};
+
+	class FieldInfo : public MemberInfo
+	{
+		public:
+			void* offset;
+			MemberType decl_type = MemberType::Field;
+			
+			FieldInfo(char* name, bool is_static, void* offset, int attrs);
+	};
+
+	class PropertyInfo : public MemberInfo
+	{
+		public:
+			MethodInfo* getter;
+			MethodInfo* setter;
+			MemberType decl_type = MemberType::Property;
+
+			PropertyInfo(char* name, bool is_static, MethodInfo* getter, MethodInfo* setter, int attrs);
 	};
 
 	class Type
@@ -73,24 +105,26 @@ namespace ULR
 			TypeType decl_type;
 			char* name;
 			int attrs;
-			std::map<char*, std::shared_ptr<MemberInfo>, cmp_chr_ptr> static_attrs;
-			std::map<char*, std::shared_ptr<MemberInfo>, cmp_chr_ptr> inst_attrs;
+			std::map<char*, MemberInfo*, cmp_chr_ptr> static_attrs;
+			std::map<char*, MemberInfo*, cmp_chr_ptr> inst_attrs;
 
 			Type(TypeType decl_type, char* name, int attrs);
 
-			void AddStaticMember(std::shared_ptr<MemberInfo> member);
-			void AddInstanceMember(std::shared_ptr<MemberInfo> member);
+			void AddStaticMember(MemberInfo* member);
+			void AddInstanceMember(MemberInfo* member);
 	};
 
 	class Assembly
 	{
 		public:
+			HMODULE handle;
 			char* name;
 			char* meta;
+			size_t metalen;
 			void** addr;
 			int (*entry)() = NULL;
-			std::map<const char*, std::shared_ptr<Type>> types;
+			std::map<const char*, Type*> types;
 
-			Assembly(char* name, char* meta, void** addr);
+			Assembly(char* name, char* meta, size_t metalen, void** addr, HMODULE handle);
 	};
 }

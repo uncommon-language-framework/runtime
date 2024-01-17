@@ -10,12 +10,12 @@ namespace ULR
 		this->attrs = attrs;
 	}
 
-	void Type::AddStaticMember(std::shared_ptr<MemberInfo> member)
+	void Type::AddStaticMember(MemberInfo* member)
 	{
 		static_attrs[member->name] = member;
 	}
 
-	void Type::AddInstanceMember(std::shared_ptr<MemberInfo> member)
+	void Type::AddInstanceMember(MemberInfo* member)
 	{
 		inst_attrs[member->name] = member;
 	}
