@@ -10,8 +10,5 @@ namespace ULR
 	// 	this->attrs = attrs;
 	// }
 
-	// MemberInfo::~MemberInfo()
-	// {
-	// 	free(name);
-	// }
+	MemberInfo::~MemberInfo() {	}
 }

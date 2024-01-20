@@ -7,9 +7,9 @@ foreach ($item in Get-ChildItem ./Lib -File -Recurse)
 
 if ($args[0] -eq "debug")
 {
-	g++ ulrhost.cpp $libfiles -o ulrhost.exe -Wall -g -D DEBUG=true
+	g++64 ulrhost.cpp $libfiles -o ulrhost.exe -O0 -Wall -g -D DEBUG=true
 }
 else
 {
-	g++ ulrhost.cpp $libfiles -o ulrhost.exe
+	g++64 ulrhost.cpp $libfiles -o ulrhost.exe
 }

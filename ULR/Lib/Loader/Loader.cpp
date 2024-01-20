@@ -12,7 +12,7 @@ namespace ULR::Loader
 
 	HMODULE ReadAssembly(char* dll)
 	{
-		HMODULE mod = LoadLibrary((LPCWSTR) dll);
+		HMODULE mod = LoadLibrary(dll);
 
 		char* meta = (char*) GetProcAddress(mod, "ulrmeta");
 		void** addr = (void**) GetProcAddress(mod, "ulraddr");
@@ -22,7 +22,6 @@ namespace ULR::Loader
 		Assembly* assembly = new Assembly(dll, meta, metalen, addr, mod);
 
 		size_t i = 0;
-		size_t metalen = strlen(meta);
 
 		while (i < metalen)
 		{
@@ -74,7 +73,7 @@ namespace ULR::Loader
 				i++;
 			}
 
-			std::string ns_name = std::string(&meta[i-ns_len], ns_len);
+			std::string ns_name = std::string((&meta[i-ns_len])-1, ns_len+2); // -1 and +2 for brackets
 
 			i++;
 
@@ -104,7 +103,7 @@ namespace ULR::Loader
 
 			size_t size = std::stoull(size_str);
 
-			Type* type = new Type(class_type, strdup((ns_name+type_name).c_str()), modflags);
+			Type* type = new Type(class_type, strdup((ns_name+type_name).c_str()), modflags, size);
 
 			/* Skip Members */
 
@@ -149,7 +148,7 @@ namespace ULR::Loader
 				i++;
 			}
 
-			std::string ns_name = std::string(&meta[i-ns_len], ns_len);
+			std::string ns_name = std::string((&meta[i-ns_len])-1, ns_len+2); // -1, +2 for brackets
 
 			i++;
 
@@ -167,7 +166,7 @@ namespace ULR::Loader
 
 			i++; // skip semicolon
 
-			Type* type = assembly->types[(ns_name+type_name).c_str()];
+			Type* type = assembly->types[const_cast<char*>((ns_name+type_name).c_str())];
 
 			/* Parse Members */
 
@@ -257,7 +256,7 @@ namespace ULR::Loader
 							i++;
 						}
 
-						std::string ns_name = std::string(&meta[i-ns_len], ns_len);
+						std::string ns_name = std::string((&meta[i-ns_len])-1, ns_len+2); // -1 and +2 to get the brackets 
 
 						i++; // skip close bracket
 
@@ -289,7 +288,7 @@ namespace ULR::Loader
 
 						std::vector<Type*> sig = ParseArgs(&i, meta);
 
-						sig.emplace_back(GetType(full_rettype.data()));
+						sig.emplace_back(GetType(const_cast<char*>(full_rettype.c_str())));
 
 						i++; // skip `;`
 
@@ -346,7 +345,7 @@ namespace ULR::Loader
 					i++;
 				}
 
-				std::string ns_name = std::string(&meta[i-ns_len], ns_len);
+				std::string ns_name = std::string((&meta[i-ns_len])-1, ns_len+2); // -1 and +2 for the brackets
 
 				i++; // skip close bracket
 
@@ -378,7 +377,7 @@ namespace ULR::Loader
 
 				std::vector<Type*> sig = ParseArgs(&i, meta);
 
-				sig.emplace_back(GetType(full_rettype.data()));
+				sig.emplace_back(GetType(const_cast<char*>(full_rettype.c_str())));
 
 				i++; // skip `;`
 
@@ -387,16 +386,14 @@ namespace ULR::Loader
 			}
 
 			i++; // skip newline
-
-			std::cout << meta[i];
 		}
-
+		
 		LoadedAssemblies[dll] = assembly;
 
 		return assembly;
 	}
 
-	std::vector<Type*> ParseArgs(size_t* i, std::string meta)
+	std::vector<Type*> ParseArgs(size_t* i, char* meta)
 	{
 		std::vector<Type*> argtypes;
 
@@ -409,7 +406,7 @@ namespace ULR::Loader
 				(*i)++;
 			}
 
-			argtypes.emplace_back(GetType(std::string(&meta[start], (*i)-start).data()));
+			argtypes.emplace_back(GetType(const_cast<char*>(std::string(&meta[start], (*i)-start).c_str())));
 
 			if (meta[*i] == ',') (*i)++;
 
@@ -420,7 +417,7 @@ namespace ULR::Loader
 		return argtypes;
 	}
 
-	Type* GetType(char* qual_name) // note that this will not work since types could accept an inst of themselves or their own asm as an arg, since the types are ptrs it would work if each type is analyzed by name first and then later fully loaded (same as lazy loading strategy)
+	Type* GetType(char* qual_name)
 	{
 		for (const auto& entry: ReadAssemblies)
 		{

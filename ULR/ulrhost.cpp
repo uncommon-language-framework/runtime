@@ -2,6 +2,7 @@
 #include "Lib/ULRAPI.hpp"
 #include "Lib/Resolver.hpp"
 #include <iostream>
+#include <set>
 #include <map>
 #include <vector>
 #include <string>
@@ -13,35 +14,46 @@ using namespace ULR::Resolver;
 
 int main(int argc, char* argv[])
 {
-	char* assembly_name = argv[1];
+	/* Load Stdlib*/
+	
+	char* stdlib_path = strdup("../../ulflib/src/native/System.Runtime.Native.dll");
+
+	Loader::ReadAssembly(stdlib_path);
+	Loader::LoadAssembly(stdlib_path);
+
+	/* Load Main Assembly */
+
+	char* assembly_name = strdup(argv[1]);
 
 	Loader::ReadAssembly(assembly_name);
 
-	Assembly* main = Loader::LoadAssembly(assembly_name);
+	Assembly* mainasm = Loader::LoadAssembly(assembly_name);
 
-	if (main->entry == NULL)
+	if (mainasm->entry == NULL)
 	{
 		throw std::runtime_error("No entry point found.");
 	}
+	
+	std::cout << mainasm->types.begin()->second->name << std::endl;
 
 	ULRAPIImpl api = ULRAPIImpl(&Loader::LoadedAssemblies);
 
-	void (*init_asm)(IULRAPI*) = (void (*)(IULRAPI*)) GetProcAddress(main->handle, "InitAssembly");
+	void (*init_asm)(IULRAPI*) = (void (*)(IULRAPI*)) GetProcAddress(mainasm->handle, "InitAssembly");
 
 	init_asm((IULRAPI*) &api);
 	
-	int retcode = main->entry();
+	int retcode = mainasm->entry();
 
 	// FreeLibrary(mod);
 
-	for (auto& entry : Loader::ReadAssemblies)
-	{
-		delete entry.second;
-	}
+	std::set<Assembly*> allocated_asms;
 
-	for (auto& entry : Loader::LoadedAssemblies)
+	for (auto& entry : Loader::ReadAssemblies) allocated_asms.emplace(entry.second);
+	for (auto& entry : Loader::LoadedAssemblies) allocated_asms.emplace(entry.second);
+
+	for (auto& allocated_assembly : allocated_asms)
 	{
-		delete entry.second;
+		delete allocated_assembly;
 	}
 
 	return retcode;

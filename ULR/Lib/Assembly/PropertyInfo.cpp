@@ -15,6 +15,7 @@ namespace ULR
 	{
 		free(name);
 
-		delete getter, setter;
+		delete getter;
+		delete setter;
 	}
 }

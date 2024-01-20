@@ -64,7 +64,24 @@ namespace ULR
 			int attrs;
 
 			// MemberInfo(MemberType decl_type, char* name, bool is_static, int attrs);
-			// ~MemberInfo();
+			virtual ~MemberInfo();
+	};
+
+	class Type
+	{
+		public:
+			TypeType decl_type;
+			char* name;
+			int attrs;
+			size_t size;
+			std::map<char*, std::vector<MemberInfo*>, cmp_chr_ptr> static_attrs;
+			std::map<char*, std::vector<MemberInfo*>, cmp_chr_ptr> inst_attrs;
+
+			Type(TypeType decl_type, char* name, int attrs, size_t size);
+			~Type();
+
+			void AddStaticMember(MemberInfo* member);
+			void AddInstanceMember(MemberInfo* member);
 	};
 
 	class MethodInfo : public MemberInfo
@@ -126,22 +143,6 @@ namespace ULR
 			~PropertyInfo();
 	};
 
-	class Type
-	{
-		public:
-			TypeType decl_type;
-			char* name;
-			int attrs;
-			std::map<char*, MemberInfo*, cmp_chr_ptr> static_attrs;
-			std::map<char*, MemberInfo*, cmp_chr_ptr> inst_attrs;
-
-			Type(TypeType decl_type, char* name, int attrs);
-			~Type();
-
-			void AddStaticMember(MemberInfo* member);
-			void AddInstanceMember(MemberInfo* member);
-	};
-
 	class Assembly
 	{
 		public:
@@ -151,7 +152,7 @@ namespace ULR
 			size_t metalen;
 			void** addr;
 			int (*entry)() = NULL;
-			std::map<const char*, Type*> types;
+			std::map<char*, Type*, cmp_chr_ptr> types;
 
 			Assembly(char* name, char* meta, size_t metalen, void** addr, HMODULE handle);
 			~Assembly();
