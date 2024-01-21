@@ -119,7 +119,7 @@ namespace ULR::Loader
 		return mod;
 	}
 
-	Assembly* LoadAssembly(char* dll)
+	Assembly* LoadAssembly(char* dll, Resolver::ULRAPIImpl* api)
 	{
 		if (LoadedAssemblies.count(dll) == 1) return LoadedAssemblies[dll];
 		if (ReadAssemblies.count(dll) == 0) throw std::runtime_error(std::string("Attempted to load assembly '")+dll+std::string("' without reading it first"));
@@ -389,6 +389,10 @@ namespace ULR::Loader
 		}
 		
 		LoadedAssemblies[dll] = assembly;
+
+		void (*init_asm)(Resolver::ULRAPIImpl*) = (void (*)(Resolver::ULRAPIImpl*)) GetProcAddress(assembly->handle, "InitAssembly");
+
+		init_asm(api);
 
 		return assembly;
 	}

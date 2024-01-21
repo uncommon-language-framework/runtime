@@ -14,12 +14,19 @@ using namespace ULR::Resolver;
 
 int main(int argc, char* argv[])
 {
+	ULRAPIImpl api = ULRAPIImpl( // perhaps refactor Loader into an object someday
+		&Loader::LoadedAssemblies,
+		&Loader::ReadAssemblies,
+		Loader::ReadAssembly,
+		Loader::LoadAssembly
+	);
+	
 	/* Load Stdlib*/
 	
 	char* stdlib_path = strdup("../../ulflib/src/native/System.Runtime.Native.dll");
 
 	Loader::ReadAssembly(stdlib_path);
-	Loader::LoadAssembly(stdlib_path);
+	Loader::LoadAssembly(stdlib_path, &api);
 
 	/* Load Main Assembly */
 
@@ -27,18 +34,12 @@ int main(int argc, char* argv[])
 
 	Loader::ReadAssembly(assembly_name);
 
-	Assembly* mainasm = Loader::LoadAssembly(assembly_name);
+	Assembly* mainasm = Loader::LoadAssembly(assembly_name, &api);
 
 	if (mainasm->entry == NULL)
 	{
 		throw std::runtime_error("No entry point found.");
 	}
-	
-	ULRAPIImpl api = ULRAPIImpl(&Loader::LoadedAssemblies);
-
-	void (*init_asm)(ULRAPIImpl*) = (void (*)(ULRAPIImpl*)) GetProcAddress(mainasm->handle, "InitAssembly");
-
-	init_asm(&api);
 	
 	int retcode = mainasm->entry();
 

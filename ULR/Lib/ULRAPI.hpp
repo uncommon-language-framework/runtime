@@ -8,6 +8,9 @@ namespace ULR::API
 	class IULRAPI
 	{
 		public:
+			bool EnsureLoaded(char assembly_name[]);
+			Assembly* LoadAssembly(char assembly_name[]);
+
 			std::vector<MemberInfo*> GetMember(Type* type, char name[]);
 
 			ConstructorInfo* GetCtor(Type* type, std::vector<Type*> signature);

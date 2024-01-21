@@ -11,11 +11,44 @@ namespace ULR::Resolver
 	class ULRAPIImpl : public API::IULRAPI
 	{
 		std::map<char*, Assembly*, cmp_chr_ptr>* assemblies;
+		std::map<char*, Assembly*, cmp_chr_ptr>* read_assemblies;
+		Assembly* (*LoadAssemblyPtr)(char name[], ULRAPIImpl* api);
+		HMODULE (*ReadAssemblyPtr)(char name[]);
 
 		public:
 			std::set<void*> allocated_objs;
 			
-			ULRAPIImpl(std::map<char*, Assembly*, cmp_chr_ptr>* assembly);
+			ULRAPIImpl(
+				std::map<char*, Assembly*, cmp_chr_ptr>* assemblies,
+				std::map<char*, Assembly*, cmp_chr_ptr>* read_assemblies,
+				HMODULE (*ReadAssembly)(char name[]),
+				Assembly* (*LoadAssembly)(char name[], ULRAPIImpl* api)
+			);
+
+			// returns true if the assembly is successfully loaded. returns false if the assembly was not read yet (and therefore cannot be loaded)
+			bool EnsureLoaded(char assembly_name[])
+			{
+				if (assemblies->count(assembly_name) == 0)
+				{
+					if (read_assemblies->count(assembly_name) == 0) return false;
+
+					LoadAssemblyPtr(assembly_name, this);
+				}
+			}
+
+			Assembly* LoadAssembly(char assembly_name[])
+			{
+				if (read_assemblies->count(assembly_name))
+				{
+					if (assemblies->count(assembly_name)) return assemblies->at(assembly_name);
+
+					return LoadAssemblyPtr(assembly_name, this);
+				}
+
+				ReadAssemblyPtr(assembly_name);
+
+				return LoadAssemblyPtr(assembly_name, this);
+			}
 
 			std::vector<MemberInfo*> GetMember(Type* type, char name[])
 			{
