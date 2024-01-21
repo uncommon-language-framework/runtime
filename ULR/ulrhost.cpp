@@ -34,17 +34,19 @@ int main(int argc, char* argv[])
 		throw std::runtime_error("No entry point found.");
 	}
 	
-	std::cout << mainasm->types.begin()->second->name << std::endl;
-
 	ULRAPIImpl api = ULRAPIImpl(&Loader::LoadedAssemblies);
 
-	void (*init_asm)(IULRAPI*) = (void (*)(IULRAPI*)) GetProcAddress(mainasm->handle, "InitAssembly");
+	void (*init_asm)(ULRAPIImpl*) = (void (*)(ULRAPIImpl*)) GetProcAddress(mainasm->handle, "InitAssembly");
 
-	init_asm((IULRAPI*) &api);
+	init_asm(&api);
 	
 	int retcode = mainasm->entry();
 
-	// FreeLibrary(mod);
+	// Final deallocation and cleanup (of ULR objects and the allocated assemblies)
+	for (auto& allocated_obj : api.allocated_objs)
+	{
+		delete allocated_obj;
+	}
 
 	std::set<Assembly*> allocated_asms;
 

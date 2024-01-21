@@ -1,14 +1,12 @@
 #include <iostream>
-#include "ulr.h"
+#include "../ULR/Lib/Public/StdULR.hpp"
 
-using namespace ULR;
-
-ULRAPI* ULRImpl = nullptr;
+ULRAPIImpl* ULRImpl = nullptr;
 
 extern "C"
 {
 
-	void InitAssembly(ULRAPI* ulr)
+	void InitAssembly(ULRAPIImpl* ulr)
 	{
 		ULRImpl = ulr;
 	}
