@@ -34,6 +34,8 @@ namespace ULR::Resolver
 
 					LoadAssemblyPtr(assembly_name, this);
 				}
+
+				return true;
 			}
 
 			Assembly* LoadAssembly(char assembly_name[])
@@ -192,12 +194,22 @@ namespace ULR::Resolver
 					if (assembly->types.count(full_qual_typename) != 0) return assembly->types[full_qual_typename];
 				}
 
+				/* try to load assemblies until type is found */
+				for (auto& entry : *read_assemblies)
+				{
+					if (assemblies->count(entry.first)) continue;
+
+					if (!EnsureLoaded(entry.first)) continue;
+
+					if (entry.second->types.count(full_qual_typename) != 0) return entry.second->types[full_qual_typename];
+				}
+
 				throw /* new TypeNotFound exc */;
 			}
 
 			Type* GetType(char full_qual_typename[], char assembly_hint[])
 			{
-				if (assemblies->count(assembly_hint) == 0) return nullptr;
+				if (!EnsureLoaded(assembly_hint)) return nullptr;
 
 				auto& assembly = (*assemblies)[assembly_hint];
 				
