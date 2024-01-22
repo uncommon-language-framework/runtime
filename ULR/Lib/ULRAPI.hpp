@@ -43,6 +43,17 @@ namespace ULR::API
 			
 			void* AllocateObject(size_t size);
 			void* AllocateZeroed(size_t size);
+			void* AllocateObjectNoGC(size_t size);
+			void* AllocateZeroedNoGC(size_t size);
+			template <typename... Args>
+				void* ConstructObject(
+					size_t size, 
+					void (*Constructor)(void* obj, Args... args), 
+					Args... args
+				);
+
+			void RegisterLocal(void* func, void* lcl);
+			void UnRegisterLocalScope(void* func);
 
 			std::set<void*> ExamineRoot(void* root);
 			std::set<void*> ExamineRoots(std::set<void*> roots);

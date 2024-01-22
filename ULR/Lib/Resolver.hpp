@@ -18,11 +18,11 @@ namespace ULR::Resolver
 		Assembly* (*LoadAssemblyPtr)(char name[], ULRAPIImpl* api);
 		HMODULE (*ReadAssemblyPtr)(char name[]);
 
+		std::map<void*, size_t> allocated_objs;
+		size_t allocated_size = 0;
+		std::map<void*, std::vector<void*>> registered_locals;
+
 		public:
-			std::map<void*, size_t> allocated_objs;
-			size_t allocated_size = 0;
-			std::map<void*, std::vector<void*>> registered_locals;
-			
 			ULRAPIImpl(
 				std::map<char*, Assembly*, cmp_chr_ptr>* assemblies,
 				std::map<char*, Assembly*, cmp_chr_ptr>* read_assemblies,
@@ -230,8 +230,6 @@ namespace ULR::Resolver
 				return type_ptr_extract[0];
 			}
 			
-			// NOTE/TODO: THE FOLLOWING METHOD IMPLS DO NOT YET REGISTER ALLOCATED OBJECTS WITH A GC
-			// THIS IS IMPORTANT AS THEY RETURN LEAKABLE REFERENCES
 			void* AllocateObject(size_t size)
 			{
 				if (allocated_size+size > TWO_GB) Collect();
@@ -266,6 +264,16 @@ namespace ULR::Resolver
 				allocated_size+=size;
 				
 				return mem;
+			}
+
+
+			template <typename... Args> void* ConstructObject(size_t size, void (*Constructor)(void* obj, Args... args), Args... args)
+			{
+				void* obj = AllocateObject(size);
+
+				Constructor(obj, args);
+
+				return obj;
 			}
 
 			void RegisterLocal(void* func, void* lcl)
@@ -355,6 +363,10 @@ namespace ULR::Resolver
 					{
 						result.num_collected++;
 						result.size_collected+=entry.second;
+
+						Type* objtype = GetTypeOf(alloced);
+
+						GetDtor(objtype)->Invoke(std::vector<void*>()); // call destructor
 
 						free(alloced);
 
