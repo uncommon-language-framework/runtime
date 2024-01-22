@@ -2,6 +2,8 @@
 #include "ULRAPI.hpp"
 #include <algorithm>
 
+#define TWO_GB 1000000000
+
 #pragma once
 
 namespace ULR::Resolver
@@ -18,6 +20,8 @@ namespace ULR::Resolver
 
 		public:
 			std::map<void*, size_t> allocated_objs;
+			size_t allocated_size = 0;
+			std::map<void*, std::vector<void*>> registered_locals;
 			
 			ULRAPIImpl(
 				std::map<char*, Assembly*, cmp_chr_ptr>* assemblies,
@@ -230,20 +234,48 @@ namespace ULR::Resolver
 			// THIS IS IMPORTANT AS THEY RETURN LEAKABLE REFERENCES
 			void* AllocateObject(size_t size)
 			{
-				void* mem = malloc(size);
+				if (allocated_size+size > TWO_GB) Collect();
 
-				allocated_objs.emplace(mem, size);
-
-				return mem;
+				return AllocateObjectNoGC(size);
 			}
 
 			void* AllocateZeroed(size_t size)
 			{
+				if (allocated_size+size > TWO_GB) Collect();
+
+				return AllocateZeroedNoGC(size);
+			}
+
+			void* AllocateObjectNoGC(size_t size)
+			{
+				void* mem = malloc(size);
+
+				allocated_objs.emplace(mem, size);
+
+				allocated_size+=size;
+
+				return mem;
+			}
+
+			void* AllocateZeroedNoGC(size_t size)
+			{
 				void* mem = calloc(size, 1);
 
 				allocated_objs.emplace(mem, size);
+
+				allocated_size+=size;
 				
 				return mem;
+			}
+
+			void RegisterLocal(void* func, void* lcl)
+			{
+				registered_locals[func].emplace_back(lcl);
+			}
+
+			void UnRegisterLocalScope(void* func)
+			{
+				registered_locals[func].clear();
 			}
 
 			std::set<void*> ExamineRoot(void* root)
@@ -285,8 +317,15 @@ namespace ULR::Resolver
 				return total;
 			}
 
-			GCResult Collect(std::set<void*> locals)
+			GCResult Collect()
 			{
+				std::set<void*> locals; // aggregate a list of all registered locals
+
+				for (auto& entry : registered_locals)
+				{
+					locals.insert(entry.second.begin(), entry.second.end());
+				}
+
 				// add static roots to local var roots
 				for (auto& entry : *assemblies)
 				{
@@ -322,6 +361,8 @@ namespace ULR::Resolver
 						allocated_objs.erase(alloced);
 					}
 				}
+
+				allocated_size-=result.size_collected;
 
 				return result;
 			}
