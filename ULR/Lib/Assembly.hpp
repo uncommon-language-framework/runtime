@@ -96,7 +96,9 @@ namespace ULR
 			
 			MethodInfo(char* name, bool is_static, std::vector<Type*> signature, void* offset, int attrs);
 			~MethodInfo();
-	};
+
+			void Invoke(void* self, std::vector<void*> args);
+		};
 
 	class ConstructorInfo : public MemberInfo
 	{
@@ -110,6 +112,8 @@ namespace ULR
 			MemberType decl_type = MemberType::Ctor;
 			
 			ConstructorInfo(std::vector<Type*> signature, void* offset, int attrs);
+
+			void Invoke(std::vector<void*> args);
 	};
 
 	class DestructorInfo : public MemberInfo
@@ -120,6 +124,8 @@ namespace ULR
 			MemberType decl_type = MemberType::Dtor;
 			
 			DestructorInfo(void* offset, int attrs);
+
+			void Invoke(std::vector<void*> args);
 	};
 
 	class FieldInfo : public MemberInfo
@@ -130,6 +136,8 @@ namespace ULR
 			
 			FieldInfo(char* name, bool is_static, void* offset, int attrs);
 			~FieldInfo();
+			
+			void* GetPointer(void* self);
 	};
 
 	class PropertyInfo : public MemberInfo
@@ -141,6 +149,10 @@ namespace ULR
 
 			PropertyInfo(char* name, bool is_static, MethodInfo* getter, MethodInfo* setter, int attrs);
 			~PropertyInfo();
+
+			void* GetValue();
+			void SetValue(void* value);
+
 	};
 
 	class Assembly

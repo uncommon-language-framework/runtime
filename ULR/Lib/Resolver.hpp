@@ -1,12 +1,13 @@
 #include "Assembly.hpp"
 #include "ULRAPI.hpp"
-#include <set>
+#include <algorithm>
 
 #pragma once
 
 namespace ULR::Resolver
 {
 	using ULR::API::BindingFlags;
+	using ULR::API::GCResult;
 
 	class ULRAPIImpl : public API::IULRAPI
 	{
@@ -16,7 +17,7 @@ namespace ULR::Resolver
 		HMODULE (*ReadAssemblyPtr)(char name[]);
 
 		public:
-			std::set<void*> allocated_objs;
+			std::map<void*, size_t> allocated_objs;
 			
 			ULRAPIImpl(
 				std::map<char*, Assembly*, cmp_chr_ptr>* assemblies,
@@ -209,13 +210,20 @@ namespace ULR::Resolver
 
 			Type* GetType(char full_qual_typename[], char assembly_hint[])
 			{
-				if (!EnsureLoaded(assembly_hint)) return nullptr;
+				if (!EnsureLoaded(assembly_hint)) throw /* new TypeNotFound exc */;
 
 				auto& assembly = (*assemblies)[assembly_hint];
 				
 				if (assembly->types.count(full_qual_typename) != 0) return assembly->types[full_qual_typename];
 
 				throw /* new TypeNotFound exc */;
+			}
+
+			Type* GetTypeOf(void* obj)
+			{
+				Type** type_ptr_extract = reinterpret_cast<Type**>(obj);
+
+				return type_ptr_extract[0];
 			}
 			
 			// NOTE/TODO: THE FOLLOWING METHOD IMPLS DO NOT YET REGISTER ALLOCATED OBJECTS WITH A GC
@@ -224,7 +232,7 @@ namespace ULR::Resolver
 			{
 				void* mem = malloc(size);
 
-				allocated_objs.emplace(mem);
+				allocated_objs.emplace(mem, size);
 
 				return mem;
 			}
@@ -233,9 +241,89 @@ namespace ULR::Resolver
 			{
 				void* mem = calloc(size, 1);
 
-				allocated_objs.emplace(mem);
+				allocated_objs.emplace(mem, size);
 				
 				return mem;
+			}
+
+			std::set<void*> ExamineRoot(void* root)
+			{
+				std::set<void*> found = { root };
+
+				Type* root_type = GetTypeOf(root);
+
+				for (auto& entry : root_type->inst_attrs)
+				{
+					if (entry.second[0]->decl_type == MemberType::Field)
+					{
+						FieldInfo* field = (FieldInfo*) entry.second[0];
+
+						if (found.count(field)) continue; // prevent circular refs
+
+						auto found_from_field = ExamineRoot(field);
+
+						found.insert(found_from_field.begin(), found_from_field.end());	
+					}
+				}
+
+				return found;
+			}
+
+			std::set<void*> ExamineRoots(std::set<void*> roots)
+			{
+				std::set<void*> total;
+
+				for (auto& root : roots)
+				{
+					if (total.count(root)) continue; // prevent circular refs
+
+					auto found = ExamineRoot(root);
+
+					total.insert(found.begin(), found.end());	
+				}
+
+				return total;
+			}
+
+			GCResult Collect(std::set<void*> locals)
+			{
+				// add static roots to local var roots
+				for (auto& entry : *assemblies)
+				{
+					for (auto& type_entry : entry.second->types)
+					{
+						for (auto& static_entry : type_entry.second->static_attrs)
+						{
+							if (static_entry.second[0]->decl_type == MemberType::Field)
+							{
+								locals.emplace(((FieldInfo*) static_entry.second[0])->offset);
+							}
+						}
+					}
+				}
+
+				std::set<void*> still_accessible = ExamineRoots(locals);
+
+				GCResult result;
+
+				auto alloced_copy = allocated_objs;
+
+				for (auto& entry : alloced_copy)
+				{
+					auto& alloced = entry.first;
+
+					if (!still_accessible.count(alloced))
+					{
+						result.num_collected++;
+						result.size_collected+=entry.second;
+
+						free(alloced);
+
+						allocated_objs.erase(alloced);
+					}
+				}
+
+				return result;
 			}
 	};
 }

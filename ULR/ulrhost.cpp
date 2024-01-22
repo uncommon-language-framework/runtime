@@ -44,9 +44,9 @@ int main(int argc, char* argv[])
 	int retcode = mainasm->entry();
 
 	// Final deallocation and cleanup (of ULR objects and the allocated assemblies)
-	for (auto& allocated_obj : api.allocated_objs)
+	for (auto& entry : api.allocated_objs)
 	{
-		delete allocated_obj;
+		free(entry.first);
 	}
 
 	std::set<Assembly*> allocated_asms;
