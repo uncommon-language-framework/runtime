@@ -4,6 +4,7 @@
 #include <iostream>
 #include <set>
 #include <map>
+#include <chrono>
 #include <vector>
 #include <string>
 #include <Windows.h>
@@ -11,6 +12,10 @@
 using namespace ULR;
 using namespace ULR::API;
 using namespace ULR::Resolver;
+
+using precise_clock = std::chrono::high_resolution_clock;
+
+#define get_duration_ns(duration) std::chrono::duration_cast<std::chrono::nanoseconds>(duration)
 
 int main(int argc, char* argv[])
 {
@@ -44,9 +49,18 @@ int main(int argc, char* argv[])
 	{
 		throw std::runtime_error("No entry point found.");
 	}
-	
-	// int retcode = mainasm->entry();
 
+
+	auto normal_start = precise_clock::now();
+	int retcode = mainasm->entry();
+	
+	auto normal_ns = get_duration_ns(precise_clock::now() - normal_start);
+
+	std::cout << "Nanoseconds for normal call: " << normal_ns.count() << std::endl;
+
+	
+	auto refl_start = precise_clock::now();
+	
 	MethodInfo* reflmainmethod = api.GetMethod(
 		api.GetType("[]Program", "ExampleAssembly.dll"),
 		"Main",
@@ -56,7 +70,10 @@ int main(int argc, char* argv[])
 
 	Type** boxedretcode = (Type**) reflmainmethod->Invoke(nullptr, { });
 
-	int retcode = *reinterpret_cast<int*>(boxedretcode+1);
+	retcode = *reinterpret_cast<int*>(boxedretcode+1);
+	
+	auto refl_ns = get_duration_ns(precise_clock::now() - refl_start);
+	std::cout << "Nanoseconds for reflection call: " << refl_ns.count() << std::endl;
 
 	// Final deallocation and cleanup (of ULR objects and the allocated assemblies)
 

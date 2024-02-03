@@ -4,9 +4,10 @@
 
 namespace ULR
 {
-	Type::Type(TypeType decl_type, char* name, int attrs, size_t size)
+	Type::Type(TypeType decl_type, Assembly* assembly, char* name, int attrs, size_t size)
 	{
 		this->decl_type = decl_type;
+		this->assembly = assembly;
 		this->name = name;
 		this->attrs = attrs;
 		this->size = size;

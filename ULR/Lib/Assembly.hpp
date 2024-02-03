@@ -62,6 +62,7 @@ namespace ULR
 	};
 
 	class Type;
+	class Assembly;
 
 	class MemberInfo
 	{
@@ -80,13 +81,14 @@ namespace ULR
 	{
 		public:
 			TypeType decl_type;
+			Assembly* assembly;
 			char* name;
 			int attrs;
 			size_t size;
 			std::map<char*, std::vector<MemberInfo*>, cmp_chr_ptr> static_attrs;
 			std::map<char*, std::vector<MemberInfo*>, cmp_chr_ptr> inst_attrs;
 
-			Type(TypeType decl_type, char* name, int attrs, size_t size);
+			Type(TypeType decl_type, Assembly* assembly, char* name, int attrs, size_t size);
 			~Type();
 
 			void AddStaticMember(MemberInfo* member);

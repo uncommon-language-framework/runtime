@@ -43,6 +43,9 @@ extern "C"
 
 		std::cout << "Hello from ExampleAssembly" << std::endl;
 
+		Type* typeofobj = api->GetTypeOf(obj);
+		std::cout << "Type of obj: " << typeofobj->name << " (" << typeofobj->assembly->name << ')' << std::endl;
+
 		ulrlocals[0] = nullptr;
 
 		return 0;

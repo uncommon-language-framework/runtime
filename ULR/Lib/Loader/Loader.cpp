@@ -124,7 +124,7 @@ namespace ULR::Loader
 
 			size_t size = std::stoull(size_str);
 
-			Type* type = new Type(class_type, strdup((ns_name+type_name).c_str()), modflags, size);
+			Type* type = new Type(class_type, assembly, strdup((ns_name+type_name).c_str()), modflags, size);
 
 			/* Skip Members */
 
