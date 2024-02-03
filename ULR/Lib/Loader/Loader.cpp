@@ -19,7 +19,19 @@ namespace ULR::Loader
 
 		size_t metalen = strlen(meta);
 
-		Assembly* assembly = new Assembly(dll, meta, metalen, addr, mod);
+		std::string as_str = dll;
+		char* asm_basename = strdup(as_str.substr(as_str.find_last_of("/\\") + 1).c_str());
+
+		Assembly* assembly = new Assembly(
+			asm_basename,
+			meta,
+			metalen,
+			addr,
+			(void**) GetProcAddress(mod, "ulrlocals"),
+			(size_t) GetProcAddress(mod, "ulrlocalslen"),
+			(size_t**) GetProcAddress(mod, "ulrlocalsmapping"),
+			mod
+		);
 
 		size_t i = 0;
 
@@ -58,9 +70,18 @@ namespace ULR::Loader
 					case 'c':
 						class_type = TypeType::Class;
 						break;
+					case 'v':
+						class_type = TypeType::Struct;
+					case 'r':
+						modflags |= Modifiers::Readonly;
 				}
 
 				i++;
+			}
+
+			if (modflags & Modifiers::Readonly && class_type & TypeType::Struct)
+			{
+				class_type = TypeType::ReadonlyStruct;
 			}
 
 			i++;
@@ -114,17 +135,21 @@ namespace ULR::Loader
 			i++; // skip newline
 		}
 
-		ReadAssemblies[dll] = assembly;
+		ReadAssemblies[asm_basename] = assembly;
 
 		return mod;
 	}
 
 	Assembly* LoadAssembly(char* dll, Resolver::ULRAPIImpl* api)
 	{
-		if (LoadedAssemblies.count(dll) == 1) return LoadedAssemblies[dll];
-		if (ReadAssemblies.count(dll) == 0) throw std::runtime_error(std::string("Attempted to load assembly '")+dll+std::string("' without reading it first"));
+		std::string as_str = dll;
 
-		Assembly* assembly = ReadAssemblies[dll];
+		char* shortname = strdup(as_str.substr(as_str.find_last_of("/\\") + 1).c_str());
+
+		if (LoadedAssemblies.count(shortname) == 1) return LoadedAssemblies[shortname];
+		if (ReadAssemblies.count(shortname) == 0) throw std::runtime_error(std::string("Attempted to load assembly '")+dll+std::string("' without reading it first"));
+
+		Assembly* assembly = ReadAssemblies[shortname];
 
 		char* meta = assembly->meta;
 		void** addr = assembly->addr;
@@ -388,7 +413,7 @@ namespace ULR::Loader
 			i++; // skip newline
 		}
 		
-		LoadedAssemblies[dll] = assembly;
+		LoadedAssemblies[shortname] = assembly;
 
 		void (*init_asm)(Resolver::ULRAPIImpl*) = (void (*)(Resolver::ULRAPIImpl*)) GetProcAddress(assembly->handle, "InitAssembly");
 

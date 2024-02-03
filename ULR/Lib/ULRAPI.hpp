@@ -47,8 +47,8 @@ namespace ULR::API
 			void* AllocateZeroedNoGC(size_t size);
 			template <typename... Args>
 				void* ConstructObject(
-					size_t size, 
-					void (*Constructor)(void* obj, Args... args), 
+					void (*Constructor)(void* obj, Args... args),
+					Type* typeptr,
 					Args... args
 				);
 

@@ -14,11 +14,13 @@ namespace ULR
 
 	void Type::AddStaticMember(MemberInfo* member)
 	{
+		member->parent_type = this;
 		static_attrs[member->name].emplace_back(member);
 	}
 
 	void Type::AddInstanceMember(MemberInfo* member)
 	{
+		member->parent_type = this;
 		inst_attrs[member->name].emplace_back(member);
 	}
 

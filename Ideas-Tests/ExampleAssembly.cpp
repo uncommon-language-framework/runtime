@@ -1,22 +1,34 @@
 #include <iostream>
 #include "../ULR/Lib/Public/StdULR.hpp"
 
-ULRAPIImpl* ULRImpl = nullptr;
+using ULR::Type;
+
+ULRAPIImpl* api = nullptr;
+
+Type* CachedProgramType;
 
 extern "C"
 {
+	const size_t ulrlocalslen = 1; // we don't use any managed locals rn, change later once used
+	const void* ulrlocals[ulrlocalslen]; // if lcls are used, then change to ulrlocals[ulrlocalslen];
+	const size_t ulrlocalsmapping[][2] = {
+		{0, 0},
+		{0, 1}
+	};
+	
 
 	void InitAssembly(ULRAPIImpl* ulr)
 	{
-		ULRImpl = ulr;
+		api = ulr;
+		CachedProgramType = api->GetType("[]Program", "ExampleAssembly.dll");
 	}
 
-	void Program_ctor(void* self /* rest of args... */)
+	void ns0_Program_ctor(void* self /* rest of args... */)
 	{
 
 	}
 
-	int Program_Main()
+	int ns0_Program_Main()
 	{
 		// void (*ns1_System_Console_WriteLine)(void*) = (void (*)(void*)) ULRImpl->GetMethod("System", "Console", "WriteLine", "void;[System]String", MethodFlags::PUBLIC | MethodFlags::STATIC);
 		// void* (*ns1_System_String_ctor)(void*) = (void* (*)(void*)) ULRImpl->GetMethod("System", "String", ".ctor", "[$native]char[]", MethodFlags::CTOR);
@@ -26,7 +38,12 @@ extern "C"
 
 		// return ns1_System_Int32_ctor(0);
 
+		void* obj = api->ConstructObject(ns0_Program_ctor, CachedProgramType);
+		ulrlocals[0] = obj;
+
 		std::cout << "Hello from ExampleAssembly" << std::endl;
+
+		ulrlocals[0] = nullptr;
 
 		return 0;
 	}
@@ -35,12 +52,12 @@ extern "C"
 	// [] -> no namespace
 	// Program -> classname
 	// $4 -> takes four bytes (4 byte pointer to actual type)
-	char ulrmeta[] = "pc[]Program$4;.ctor p();.entr s[System]Int32 Main();\n"
+	char ulrmeta[] = "pc[]Program$8;.ctor p();.entr s[System]Int32 Main();\n"
 	""
 	"";
 
 	void* ulraddr[] = {
-		(void*) Program_ctor,
-		(void*) Program_Main
+		(void*) ns0_Program_ctor,
+		(void*) ns0_Program_Main
 	};
 }

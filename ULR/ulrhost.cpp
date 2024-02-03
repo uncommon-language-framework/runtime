@@ -20,7 +20,11 @@ int main(int argc, char* argv[])
 		Loader::ReadAssembly,
 		Loader::LoadAssembly
 	);
+
+	/* Initialize Internal Library */
 	
+	ULR::internal_api = &api;
+
 	/* Load Stdlib*/
 	
 	char* stdlib_path = strdup("../../ulflib/src/native/System.Runtime.Native.dll");
@@ -36,18 +40,32 @@ int main(int argc, char* argv[])
 
 	Assembly* mainasm = Loader::LoadAssembly(assembly_name, &api);
 
-	if (mainasm->entry == NULL)
+	if (mainasm->entry == nullptr)
 	{
 		throw std::runtime_error("No entry point found.");
 	}
 	
-	int retcode = mainasm->entry();
+	// int retcode = mainasm->entry();
+
+	MethodInfo* reflmainmethod = api.GetMethod(
+		api.GetType("[]Program", "ExampleAssembly.dll"),
+		"Main",
+		{ api.GetType("[System]Int32", "System.Runtime.Native.dll") },
+		BindingFlags::Static | BindingFlags::NonPublic
+	);
+
+	Type** boxedretcode = (Type**) reflmainmethod->Invoke(nullptr, { });
+
+	int retcode = *reinterpret_cast<int*>(boxedretcode+1);
 
 	// Final deallocation and cleanup (of ULR objects and the allocated assemblies)
+
 	for (auto& entry : api.allocated_objs)
 	{
 		free(entry.first);
 	}
+
+	api.allocated_size = 0;
 
 	std::set<Assembly*> allocated_asms;
 

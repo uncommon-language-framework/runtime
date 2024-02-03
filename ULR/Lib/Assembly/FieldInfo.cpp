@@ -4,6 +4,7 @@ namespace ULR
 {
 	FieldInfo::FieldInfo(char* name, bool is_static, void* offset, int attrs)
 	{
+		this->decl_type = MemberType::Field;
 		this->name = name;
 		this->is_static = is_static;
 		this->offset = offset;

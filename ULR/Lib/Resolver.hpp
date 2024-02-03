@@ -1,8 +1,13 @@
 #include "Assembly.hpp"
 #include "ULRAPI.hpp"
 #include <algorithm>
+#include <iostream>
+#include <type_traits>
 
-#define TWO_GB 1000000000
+#define MB *1000000
+#define GB *(1000 MB)
+#define MAX_OBJ_SIZE 1 GB
+#define GC_TRIGGER_SIZE 2 GB
 
 #pragma once
 
@@ -18,11 +23,12 @@ namespace ULR::Resolver
 		Assembly* (*LoadAssemblyPtr)(char name[], ULRAPIImpl* api);
 		HMODULE (*ReadAssemblyPtr)(char name[]);
 
-		std::map<void*, size_t> allocated_objs;
-		size_t allocated_size = 0;
-		std::map<void*, std::vector<void*>> registered_locals;
+		size_t prev_size_accessible = 0;
 
 		public:
+			std::map<void*, size_t> allocated_objs;
+			size_t allocated_size = 0;
+
 			ULRAPIImpl(
 				std::map<char*, Assembly*, cmp_chr_ptr>* assemblies,
 				std::map<char*, Assembly*, cmp_chr_ptr>* read_assemblies,
@@ -30,7 +36,7 @@ namespace ULR::Resolver
 				Assembly* (*LoadAssembly)(char name[], ULRAPIImpl* api)
 			);
 
-			// returns true if the assembly is successfully loaded. returns false if the assembly was not read yet (and therefore cannot be loaded)
+			// returns true if the assembly is successfully loaded. returns false if the assembly was not read yet (and therefore cannot be loaded). If the assembly was read but not loaded, this function loads the assembly fully and returns true
 			bool EnsureLoaded(char assembly_name[])
 			{
 				if (assemblies->count(assembly_name) == 0)
@@ -95,8 +101,11 @@ namespace ULR::Resolver
 
 							if (casted->signature == signature)
 							{
-								if (member->attrs & Modifiers::Public && bindingflags & BindingFlags::Public) return casted;
-								if (bindingflags & BindingFlags::NonPublic) return casted;
+								if (member->attrs & Modifiers::Public)
+								{
+									if(bindingflags & BindingFlags::Public) return casted;
+								}
+								else if (bindingflags & BindingFlags::NonPublic) return casted;
 							}
 						}
 					}
@@ -112,8 +121,11 @@ namespace ULR::Resolver
 
 							if (casted->signature == signature)
 							{
-								if (member->attrs & Modifiers::Public && bindingflags & BindingFlags::Public) return casted;
-								if (bindingflags & BindingFlags::NonPublic) return casted;
+								if (member->attrs & Modifiers::Public)
+								{
+									if(bindingflags & BindingFlags::Public) return casted;
+								}
+								else if (bindingflags & BindingFlags::NonPublic) return casted;
 							}
 						}
 					}
@@ -214,13 +226,13 @@ namespace ULR::Resolver
 
 			Type* GetType(char full_qual_typename[], char assembly_hint[])
 			{
-				if (!EnsureLoaded(assembly_hint)) throw /* new TypeNotFound exc */;
+				if (read_assemblies->count(assembly_hint) == 0 && assemblies->count(assembly_hint)) throw std::runtime_error("first fault") /* new TypeNotFound exc */;
 
 				auto& assembly = (*assemblies)[assembly_hint];
 				
 				if (assembly->types.count(full_qual_typename) != 0) return assembly->types[full_qual_typename];
 
-				throw /* new TypeNotFound exc */;
+				throw std::runtime_error("second fault") /* new TypeNotFound exc */;
 			}
 
 			Type* GetTypeOf(void* obj)
@@ -232,14 +244,14 @@ namespace ULR::Resolver
 			
 			void* AllocateObject(size_t size)
 			{
-				if (allocated_size+size > TWO_GB) Collect();
+				if (allocated_size+size > GC_TRIGGER_SIZE && ((allocated_size+size) - prev_size_accessible) > 10 MB) Collect();
 
 				return AllocateObjectNoGC(size);
 			}
 
 			void* AllocateZeroed(size_t size)
 			{
-				if (allocated_size+size > TWO_GB) Collect();
+				if (allocated_size+size > GC_TRIGGER_SIZE && ((allocated_size+size) - prev_size_accessible) > 10 MB) Collect();
 
 				return AllocateZeroedNoGC(size);
 			}
@@ -267,24 +279,29 @@ namespace ULR::Resolver
 			}
 
 
-			template <typename... Args> void* ConstructObject(size_t size, void (*Constructor)(void* obj, Args... args), Args... args)
+			template <typename... Args> void* ConstructObject(void (*Constructor)(void* obj, Args... args), Type* typeptr, Args... args)
 			{
-				void* obj = AllocateObject(size);
+				void* obj = AllocateObject(typeptr->size);
 
-				Constructor(obj, args);
+				Type** obj_for_type_place = reinterpret_cast<Type**>(obj);
+
+				obj_for_type_place[0] = typeptr;
+
+				Constructor(obj, args...);
 
 				return obj;
 			}
 
-			void RegisterLocal(void* func, void* lcl)
-			{
-				registered_locals[func].emplace_back(lcl);
-			}
+			// TODO/IMPORTANT: SEE COMMENT BELOW NEXT TO FUNC DECL
+			// void RegisterLocal(void* lcl) // change -- this creates a heap allocation from std::vector for every local (and function call)
+			// {
+			// 	registered_locals.emplace_back(lcl);
+			// }
 
-			void UnRegisterLocalScope(void* func)
-			{
-				registered_locals[func].clear();
-			}
+			// void UnRegisterLocal(void* lcl)
+			// {
+			// 	registered_locals.erase();
+			// }
 
 			std::set<void*> ExamineRoot(void* root)
 			{
@@ -298,9 +315,11 @@ namespace ULR::Resolver
 					{
 						FieldInfo* field = (FieldInfo*) entry.second[0];
 
-						if (found.count(field)) continue; // prevent circular refs
+						void* fieldval = field->GetPointer(root);
 
-						auto found_from_field = ExamineRoot(field);
+						if (found.count(fieldval)) continue; // prevent circular refs
+
+						auto found_from_field = ExamineRoot(fieldval);
 
 						found.insert(found_from_field.begin(), found_from_field.end());	
 					}
@@ -327,29 +346,34 @@ namespace ULR::Resolver
 
 			GCResult Collect()
 			{
-				std::set<void*> locals; // aggregate a list of all registered locals
+				std::set<void*> roots; // aggregate a list of all registered locals
 
-				for (auto& entry : registered_locals)
-				{
-					locals.insert(entry.second.begin(), entry.second.end());
-				}
-
-				// add static roots to local var roots
 				for (auto& entry : *assemblies)
 				{
+					// add local var addrs to roots
+					for (size_t i = 0; i < entry.second->localslen; i++)
+					{
+						void* lcladdr = entry.second->locals[i];
+
+						if (lcladdr == nullptr) continue;
+
+						roots.emplace(lcladdr); // add the local var to the application root
+					}
+
+					// add static roots to local var roots
 					for (auto& type_entry : entry.second->types)
 					{
 						for (auto& static_entry : type_entry.second->static_attrs)
 						{
 							if (static_entry.second[0]->decl_type == MemberType::Field)
 							{
-								locals.emplace(((FieldInfo*) static_entry.second[0])->offset);
+								roots.emplace(((FieldInfo*) static_entry.second[0])->offset);
 							}
 						}
 					}
 				}
 
-				std::set<void*> still_accessible = ExamineRoots(locals);
+				std::set<void*> still_accessible = ExamineRoots(roots);
 
 				GCResult result;
 
@@ -366,7 +390,7 @@ namespace ULR::Resolver
 
 						Type* objtype = GetTypeOf(alloced);
 
-						GetDtor(objtype)->Invoke(std::vector<void*>()); // call destructor
+						GetDtor(objtype)->Invoke(alloced); // call destructor
 
 						free(alloced);
 
@@ -376,7 +400,14 @@ namespace ULR::Resolver
 
 				allocated_size-=result.size_collected;
 
+				prev_size_accessible = allocated_size;
+
 				return result;
 			}
 	};
+}
+
+namespace ULR
+{
+	extern Resolver::ULRAPIImpl* internal_api;
 }

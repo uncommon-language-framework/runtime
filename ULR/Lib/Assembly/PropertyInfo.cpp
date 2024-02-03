@@ -4,6 +4,7 @@ namespace ULR
 {
 	PropertyInfo::PropertyInfo(char* name, bool is_static, MethodInfo* getter, MethodInfo* setter, int attrs)
 	{
+		this->decl_type = MemberType::Property;
 		this->name = name;
 		this->is_static = is_static;
 		this->getter = getter;
