@@ -6,3 +6,5 @@
 - finish ConstructorInfo::Invoke method (should just be like methodinfo but with self as first arg and returning nothing)
 - efficient vtable for vcalls
 - add methodinvoke for non win64 systems
+- add gc logic which searches thru arrays (and spans in the future)
+- allow methods to be void

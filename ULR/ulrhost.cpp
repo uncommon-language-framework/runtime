@@ -50,15 +50,6 @@ int main(int argc, char* argv[])
 		throw std::runtime_error("No entry point found.");
 	}
 
-
-	auto normal_start = precise_clock::now();
-	int retcode = mainasm->entry();
-	
-	auto normal_ns = get_duration_ns(precise_clock::now() - normal_start);
-
-	std::cout << "Nanoseconds for normal call: " << normal_ns.count() << std::endl;
-
-	
 	auto refl_start = precise_clock::now();
 	
 	MethodInfo* reflmainmethod = api.GetMethod(
@@ -68,12 +59,20 @@ int main(int argc, char* argv[])
 		BindingFlags::Static | BindingFlags::NonPublic
 	);
 
-	Type** boxedretcode = (Type**) reflmainmethod->Invoke(nullptr, { });
+	void* boxedretcode = reflmainmethod->Invoke(nullptr, { });
 
-	retcode = *reinterpret_cast<int*>(boxedretcode+1);
+	int retcode = api.UnBox<int>(boxedretcode);
 	
 	auto refl_ns = get_duration_ns(precise_clock::now() - refl_start);
 	std::cout << "Nanoseconds for reflection call: " << refl_ns.count() << std::endl;
+
+	auto normal_start = precise_clock::now();
+	
+	retcode = mainasm->entry(); // allocation caching skews the results -- must change this
+	
+	auto normal_ns = get_duration_ns(precise_clock::now() - normal_start);
+
+	std::cout << "Nanoseconds for normal call: " << normal_ns.count() << std::endl;
 
 	// Final deallocation and cleanup (of ULR objects and the allocated assemblies)
 

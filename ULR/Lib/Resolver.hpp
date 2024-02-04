@@ -404,6 +404,28 @@ namespace ULR::Resolver
 
 				return result;
 			}
+
+			template <typename ValueType> void* Box(ValueType& obj, Type* typeptr)
+			{
+				Type** boxed = (Type**) AllocateObject(sizeof(Type*)+sizeof(ValueType));
+
+				boxed[0] = typeptr;
+				
+				ValueType* obj_for_val_place = (ValueType*) (boxed+1);
+
+				obj_for_val_place[0] = obj;
+
+				return boxed;
+			}
+
+			template <typename ValueType> ValueType UnBox(void* boxed)
+			{
+				return *(
+					(ValueType*) (
+						((Type**) boxed)+1
+					)
+				);
+			}
 	};
 }
 

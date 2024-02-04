@@ -58,5 +58,11 @@ namespace ULR::API
 			std::set<void*> ExamineRoot(void* root);
 			std::set<void*> ExamineRoots(std::set<void*> roots);
 			GCResult Collect(std::set<void*> locals);
+
+			template <typename ValueType>
+				void* Box(ValueType& obj);
+
+			template <typename ValueType>
+				ValueType UnBox(void* boxed);
 	};
 }
