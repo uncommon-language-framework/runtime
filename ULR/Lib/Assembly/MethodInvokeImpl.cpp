@@ -15,7 +15,9 @@ namespace ULR
 
 		#ifdef _WIN64
 
-		std::vector<Type*> lclsig = signature;
+		std::vector<Type*> lclsig = argsig;
+
+		lclsig.emplace_back(rettype);
 		
 		if (!is_static)
 		{

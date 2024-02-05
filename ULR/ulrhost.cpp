@@ -13,9 +13,10 @@ using namespace ULR;
 using namespace ULR::API;
 using namespace ULR::Resolver;
 
-using precise_clock = std::chrono::high_resolution_clock;
+using std::chrono::duration;
+using precise_clock = std::chrono::steady_clock;
 
-#define get_duration_ns(duration) std::chrono::duration_cast<std::chrono::nanoseconds>(duration)
+#define get_duration_ms(duration) std::chrono::duration_cast<std::chrono::nanoseconds>(duration)
 
 int main(int argc, char* argv[])
 {
@@ -55,7 +56,7 @@ int main(int argc, char* argv[])
 	MethodInfo* reflmainmethod = api.GetMethod(
 		api.GetType("[]Program", "ExampleAssembly.dll"),
 		"Main",
-		{ api.GetType("[System]Int32", "System.Runtime.Native.dll") },
+		{ },
 		BindingFlags::Static | BindingFlags::NonPublic
 	);
 
@@ -63,16 +64,16 @@ int main(int argc, char* argv[])
 
 	int retcode = api.UnBox<int>(boxedretcode);
 	
-	auto refl_ns = get_duration_ns(precise_clock::now() - refl_start);
-	std::cout << "Nanoseconds for reflection call: " << refl_ns.count() << std::endl;
+	duration<double, std::nano> refl_ms = precise_clock::now() - refl_start;
+	std::cout << "Milliseconds for reflection call: " << refl_ms.count() << std::endl;
 
 	auto normal_start = precise_clock::now();
 	
 	retcode = mainasm->entry(); // allocation caching skews the results -- must change this
 	
-	auto normal_ns = get_duration_ns(precise_clock::now() - normal_start);
+	duration<double, std::nano> normal_ms = precise_clock::now() - normal_start;
 
-	std::cout << "Nanoseconds for normal call: " << normal_ns.count() << std::endl;
+	std::cout << "Milliseconds for normal call: " << normal_ms.count() << std::endl;
 
 	// Final deallocation and cleanup (of ULR objects and the allocated assemblies)
 

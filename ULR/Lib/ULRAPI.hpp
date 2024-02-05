@@ -33,7 +33,7 @@ namespace ULR::API
 			ConstructorInfo* GetCtor(Type* type, std::vector<Type*> signature);
 			DestructorInfo* GetDtor(Type* type);
 
-			MethodInfo* GetMethod(Type* type, char name[], std::vector<Type*> signature, int bindingflags);
+			MethodInfo* GetMethod(Type* type, char name[], std::vector<Type*> argsignature, int bindingflags);
 			FieldInfo* GetField(Type* type, char name[], int bindingflags);
 			PropertyInfo* GetProperty(Type* type, char name[], int bindingflags);
 			

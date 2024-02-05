@@ -311,13 +311,11 @@ namespace ULR::Loader
 						
 						i++; // skip open paren
 
-						std::vector<Type*> sig = ParseArgs(&i, meta);
-
-						sig.emplace_back(GetType(const_cast<char*>(full_rettype.c_str())));
+						std::vector<Type*> argsig = ParseArgs(&i, meta);
 
 						i++; // skip `;`
 
-						type->AddStaticMember(new MethodInfo(strdup(func_name.c_str()), true, sig, addr[nummember], attrs));
+						type->AddStaticMember(new MethodInfo(strdup(func_name.c_str()), true, argsig, GetType(const_cast<char*>(full_rettype.c_str())), addr[nummember], attrs));
 						
 						assembly->entry = (int (*)()) addr[nummember];
 						
@@ -400,14 +398,12 @@ namespace ULR::Loader
 				
 				i++; // skip open paren
 
-				std::vector<Type*> sig = ParseArgs(&i, meta);
-
-				sig.emplace_back(GetType(const_cast<char*>(full_rettype.c_str())));
+				std::vector<Type*> argsig = ParseArgs(&i, meta);
 
 				i++; // skip `;`
 
-				if (attrs & Modifiers::Static) type->AddStaticMember(new MethodInfo(strdup(func_name.c_str()), true, sig, addr[nummember], attrs));
-				else type->AddInstanceMember(new MethodInfo(strdup(func_name.c_str()), false, sig, addr[nummember], attrs));
+				if (attrs & Modifiers::Static) type->AddStaticMember(new MethodInfo(strdup(func_name.c_str()), true, argsig, GetType(const_cast<char*>(full_rettype.c_str())), addr[nummember], attrs));
+				else type->AddInstanceMember(new MethodInfo(strdup(func_name.c_str()), false, argsig, GetType(const_cast<char*>(full_rettype.c_str())), addr[nummember], attrs));
 			}
 
 			i++; // skip newline

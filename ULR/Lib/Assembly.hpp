@@ -101,10 +101,11 @@ namespace ULR
 			/* `signature` where
 					<argtype> <argtype> <rettype>
 					(rettype is the last type element) */
-			std::vector<Type*> signature;
+			std::vector<Type*> argsig;
+			Type* rettype;
 			void* offset;
 			
-			MethodInfo(char* name, bool is_static, std::vector<Type*> signature, void* offset, int attrs);
+			MethodInfo(char* name, bool is_static, std::vector<Type*> argsig, Type* rettype, void* offset, int attrs);
 			~MethodInfo();
 
 			void* Invoke(void* self, std::vector<void*> args); // Invoke, GetPointer, and the like have to be defined in the header so that they can be accessible by compilations

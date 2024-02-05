@@ -89,7 +89,7 @@ namespace ULR::Resolver
 				throw /* new NoConstructor exc*/;
 			}
 
-			MethodInfo* GetMethod(Type* type, char name[], std::vector<Type*> signature, int bindingflags)
+			MethodInfo* GetMethod(Type* type, char name[], std::vector<Type*> argsignature, int bindingflags)
 			{
 				if (bindingflags & BindingFlags::Instance)
 				{
@@ -99,7 +99,7 @@ namespace ULR::Resolver
 						{
 							MethodInfo* casted = (MethodInfo*) member;
 
-							if (casted->signature == signature)
+							if (casted->argsig == argsignature)
 							{
 								if (member->attrs & Modifiers::Public)
 								{
@@ -119,7 +119,7 @@ namespace ULR::Resolver
 						{
 							MethodInfo* casted = (MethodInfo*) member;
 
-							if (casted->signature == signature)
+							if (casted->argsig == argsignature)
 							{
 								if (member->attrs & Modifiers::Public)
 								{
