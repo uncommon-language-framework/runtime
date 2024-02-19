@@ -20,6 +20,7 @@ extern "C"
 	void InitAssembly(ULRAPIImpl* ulr)
 	{
 		api = ulr;
+		internal_api = ulr;
 		CachedProgramType = api->GetType("[]Program", "ExampleAssembly.dll");
 	}
 
@@ -55,7 +56,7 @@ extern "C"
 	// [] -> no namespace
 	// Program -> classname
 	// $4 -> takes four bytes (4 byte pointer to actual type)
-	char ulrmeta[] = "pc[]Program$8;.ctor p();.entr s[System]Int32 Main();\n"
+	char ulrmeta[] = "pc[]Program:[System]Object$8;.ctor p();.entr s[System]Int32 Main();\n"
 	""
 	"";
 

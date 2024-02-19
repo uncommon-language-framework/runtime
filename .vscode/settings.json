@@ -7,6 +7,10 @@
 		"*.pg": "html",
 		"*.pgx": "xml",
 		"*.cb": "csharp",
+		"Todo": "markdown",
+		"ulr": "cpp",
+		"stdulr": "cpp",
+		"*.rts": "python",
 		"xstring": "cpp",
 		"xtree": "cpp",
 		"memory": "cpp",
@@ -78,6 +82,17 @@
 		"sstream": "cpp",
 		"filesystem": "cpp",
 		"chrono": "cpp",
-		"ratio": "cpp"
-	}
+		"ratio": "cpp",
+		"assembly.hpp": "c",
+		"ulrapi.hpp": "c",
+		"condition_variable": "cpp",
+		"numeric": "cpp",
+		"random": "cpp",
+		"mutex": "cpp",
+		"shared_mutex": "cpp",
+		"thread": "cpp",
+		"future": "cpp",
+		"variant": "cpp"
+	},
+	"C_Cpp.default.compilerPath": "D:\\mingw64\\bin\\g++.exe"
 }

@@ -12,6 +12,7 @@ namespace ULR::Loader
 {
 	extern std::map<char*, Assembly*, cmp_chr_ptr> ReadAssemblies;
 	extern std::map<char*, Assembly*, cmp_chr_ptr> LoadedAssemblies;
+	extern std::vector<GenericPlaceholder*> alloced_generic_placeholders;
 
 	HMODULE ReadAssembly(char* dll);
 	Assembly* LoadAssembly(char* dll, Resolver::ULRAPIImpl* api);

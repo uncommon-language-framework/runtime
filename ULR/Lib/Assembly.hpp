@@ -1,3 +1,5 @@
+#define __STDC_FORMAT_MACROS
+
 #include <Windows.h>
 #include <map>
 #include <memory>
@@ -9,24 +11,21 @@
 
 #pragma once
 
-#define IsBoxableStruct(typeptr) typeptr->decl_type == TypeType::Struct || typeptr->decl_type == TypeType::ReadonlyStruct
+#define IsBoxableStruct(typeptr) typeptr->decl_type == TypeType::Struct
 #define IsEvenStructSize(typeptr) typeptr->size == 1 || typeptr->size == 2 || typeptr->size == 4 || typeptr->size == 8
 // everything <= 8 should be friendly since the rest of the bytes
-#define IsFriendlyStructSize(typeptr) typeptr->size <= 8
+#define IsFriendlyStructSizex64(typeptr) typeptr->size <= 8
 
 namespace ULR
 {
 	enum TypeType
 	{
-		Class = 1,
+		Class,
 		Struct,
-		ReadonlyStruct,
 		RefStruct,
-		ReadonlyRefStruct,
-		StaticClass,
-		AbstractClass,
-		FinalClass,
-		Record
+		Record,
+		Interface,
+		ArrayType
 	};
 
 	enum MemberType
@@ -72,6 +71,7 @@ namespace ULR
 			bool is_static;
 			char* name;
 			int attrs;
+			bool is_empty_generic;
 
 			// MemberInfo(MemberType decl_type, char* name, bool is_static, int attrs);
 			virtual ~MemberInfo();
@@ -83,16 +83,49 @@ namespace ULR
 			TypeType decl_type;
 			Assembly* assembly;
 			char* name;
-			int attrs;
+			unsigned int attrs;
 			size_t size;
 			std::map<char*, std::vector<MemberInfo*>, cmp_chr_ptr> static_attrs;
 			std::map<char*, std::vector<MemberInfo*>, cmp_chr_ptr> inst_attrs;
+			
+			std::vector<Type*> interfaces;
+			Type* immediate_base;
 
-			Type(TypeType decl_type, Assembly* assembly, char* name, int attrs, size_t size);
-			~Type();
+			bool is_empty_generic;
+			bool is_generic_construction;
+			unsigned int num_type_args;
+			std::vector<Type*> type_args;
+
+			Type(
+				TypeType decl_type,
+				Assembly* assembly,
+				char* name,
+				unsigned int attrs,
+				size_t size,
+				std::vector<Type*> interfaces,
+				Type* immediate_base,
+				bool is_empty_generic,
+				unsigned int num_type_args
+				);
+			virtual ~Type();
 
 			void AddStaticMember(MemberInfo* member);
 			void AddInstanceMember(MemberInfo* member);
+
+			// assumes that the call is valid (`type_args` has the right number of args, `this` is a generic type)
+			Type* MakeGeneric(std::vector<Type*> type_args);
+			virtual bool IsGenericPlaceholder() { return false; }
+	};
+
+	class GenericPlaceholder : public Type
+	{
+		public:
+			unsigned char num;
+
+			GenericPlaceholder(unsigned char generic_num) :
+				Type(TypeType::Class, nullptr, "", 0, 0, std::vector<Type*>(), nullptr, false, 0),
+				num(generic_num) {};
+			bool IsGenericPlaceholder() { return true; }
 	};
 
 	class MethodInfo : public MemberInfo
@@ -104,8 +137,9 @@ namespace ULR
 			std::vector<Type*> argsig;
 			Type* rettype;
 			void* offset;
+			char* generic_llir;
 			
-			MethodInfo(char* name, bool is_static, std::vector<Type*> argsig, Type* rettype, void* offset, int attrs);
+			MethodInfo(char* name, bool is_static, std::vector<Type*> argsig, Type* rettype, void* offset, int attrs, bool is_generic, char* generic_llir = nullptr);
 			~MethodInfo();
 
 			void* Invoke(void* self, std::vector<void*> args); // Invoke, GetPointer, and the like have to be defined in the header so that they can be accessible by compilations
@@ -120,8 +154,9 @@ namespace ULR
 			std::vector<Type*> signature;
 			void* offset;
 			bool is_static = true;
+			char* generic_llir;
 			
-			ConstructorInfo(std::vector<Type*> signature, void* offset, int attrs);
+			ConstructorInfo(std::vector<Type*> signature, void* offset, int attrs, bool is_generic, char* generic_llir = nullptr);
 
 			void Invoke(std::vector<void*> args);
 	};
@@ -131,8 +166,9 @@ namespace ULR
 		public:
 			void* offset;
 			bool is_static = false;
+			char* generic_llir;
 			
-			DestructorInfo(void* offset, int attrs);
+			DestructorInfo(void* offset, int attrs, bool is_generic, char* generic_llir = nullptr);
 
 			void Invoke(void* obj)
 			{
@@ -151,18 +187,13 @@ namespace ULR
 	{
 		public:
 			void* offset;
+			Type* valtype;
 			
-			FieldInfo(char* name, bool is_static, void* offset, int attrs);
+			FieldInfo(char* name, bool is_static, void* offset, Type* valtype, int attrs, bool is_generic);
 			~FieldInfo();
 			
-			void* GetPointer(void* self)
-			{
-				if (is_static) return offset;
-				
-				return ((char*) self)+((size_t) offset);
-			}
-
-
+			void* GetValue(void* self);
+			void SetValue(void* self, void* value);
 	};
 
 	class PropertyInfo : public MemberInfo
@@ -170,12 +201,13 @@ namespace ULR
 		public:
 			MethodInfo* getter;
 			MethodInfo* setter;
+			Type* valtype;
 
-			PropertyInfo(char* name, bool is_static, MethodInfo* getter, MethodInfo* setter, int attrs);
+			PropertyInfo(char* name, bool is_static, Type* valtype, MethodInfo* getter, MethodInfo* setter, int attrs, bool is_generic);
 			~PropertyInfo();
 
-			void* GetValue();
-			void SetValue(void* value);
+			void* GetValue(void* inst);
+			void SetValue(void* inst, void* value);
 
 	};
 

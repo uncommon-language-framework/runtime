@@ -1,16 +1,16 @@
 #include "Lib/Loader.hpp"
-#include "Lib/ULRAPI.hpp"
 #include "Lib/Resolver.hpp"
 #include <iostream>
 #include <set>
 #include <map>
 #include <chrono>
 #include <vector>
+#include <codecvt>
+#include <locale>
 #include <string>
 #include <Windows.h>
 
 using namespace ULR;
-using namespace ULR::API;
 using namespace ULR::Resolver;
 
 using std::chrono::duration;
@@ -18,9 +18,10 @@ using precise_clock = std::chrono::steady_clock;
 
 #define get_duration_ms(duration) std::chrono::duration_cast<std::chrono::nanoseconds>(duration)
 
+
 int main(int argc, char* argv[])
 {
-	ULRAPIImpl api = ULRAPIImpl( // perhaps refactor Loader into an object someday
+	ULRAPIImpl lclapi = ULRAPIImpl( // perhaps refactor Loader into an object someday
 		&Loader::LoadedAssemblies,
 		&Loader::ReadAssemblies,
 		Loader::ReadAssembly,
@@ -28,15 +29,16 @@ int main(int argc, char* argv[])
 	);
 
 	/* Initialize Internal Library */
-	
-	ULR::internal_api = &api;
 
+	internal_api = &lclapi;
+
+	
 	/* Load Stdlib*/
 	
 	char* stdlib_path = strdup("../../ulflib/src/native/System.Runtime.Native.dll");
 
 	Loader::ReadAssembly(stdlib_path);
-	Loader::LoadAssembly(stdlib_path, &api);
+	Loader::LoadAssembly(stdlib_path, &lclapi);
 
 	/* Load Main Assembly */
 
@@ -44,45 +46,62 @@ int main(int argc, char* argv[])
 
 	Loader::ReadAssembly(assembly_name);
 
-	Assembly* mainasm = Loader::LoadAssembly(assembly_name, &api);
+	Assembly* mainasm = Loader::LoadAssembly(assembly_name, &lclapi);
 
 	if (mainasm->entry == nullptr)
 	{
 		throw std::runtime_error("No entry point found.");
 	}
 
-	auto refl_start = precise_clock::now();
+	int retcode;
 	
-	MethodInfo* reflmainmethod = api.GetMethod(
-		api.GetType("[]Program", "ExampleAssembly.dll"),
-		"Main",
-		{ },
-		BindingFlags::Static | BindingFlags::NonPublic
-	);
+	try { retcode = mainasm->entry(); }
+	catch (void* exc)
+	{
+		Type* SystemException = lclapi.GetTypeOf(exc); // OR GetType("[System]Exception", "System.Runtime.Native.dll")
 
-	void* boxedretcode = reflmainmethod->Invoke(nullptr, { });
+		PropertyInfo* StackTraceProperty = lclapi.GetProperty(SystemException, "StackTrace", BindingFlags::Instance | BindingFlags::Public);
+		PropertyInfo* MessageProperty = lclapi.GetProperty(SystemException, "Message", BindingFlags::Instance | BindingFlags::Public);
 
-	int retcode = api.UnBox<int>(boxedretcode);
+		// These are both System_Strings
+		// void* stacktrace = StackTraceProperty->GetValue(exc);
+		// void* message = MessageProperty->GetValue(exc);
+
+		void* stacktrace = nullptr;
+		void* message = nullptr;
+
+		// extract char16_t from strings
+
+		int message_len = *((int*) ((char*) message)+sizeof(Type*)); // we don't need stacktrace len because it will never have a null char
+
+		char16_t* stacktrace_cstr = (char16_t*) ((char*) stacktrace)+sizeof(Type*)+sizeof(int);
+		char16_t* message_cstr = (char16_t*) ((char*) message)+sizeof(Type*)+sizeof(int);
+
+		std::u16string stacktrace_cppstr = stacktrace_cstr;
+		std::u16string message_cppstr(message_cstr, message_len);
+
+		std::wstring_convert<std::codecvt_utf8<char16_t>, char16_t> converter;
+
+		// does this work?
+		std::cout
+			<< "Exception of type "
+			<< SystemException->name
+			<< " thrown: "
+			<< converter.to_bytes(message_cppstr)
+			<< " ---- Stacktrace: "
+			<< converter.to_bytes(stacktrace_cppstr);
+
+		return 1;
+	}
 	
-	duration<double, std::nano> refl_ms = precise_clock::now() - refl_start;
-	std::cout << "Milliseconds for reflection call: " << refl_ms.count() << std::endl;
-
-	auto normal_start = precise_clock::now();
-	
-	retcode = mainasm->entry(); // allocation caching skews the results -- must change this
-	
-	duration<double, std::nano> normal_ms = precise_clock::now() - normal_start;
-
-	std::cout << "Milliseconds for normal call: " << normal_ms.count() << std::endl;
-
 	// Final deallocation and cleanup (of ULR objects and the allocated assemblies)
 
-	for (auto& entry : api.allocated_objs)
+	for (auto& entry : lclapi.allocated_objs)
 	{
 		free(entry.first);
 	}
 
-	api.allocated_size = 0;
+	lclapi.allocated_size = 0;
 
 	std::set<Assembly*> allocated_asms;
 
@@ -92,6 +111,11 @@ int main(int argc, char* argv[])
 	for (auto& allocated_assembly : allocated_asms)
 	{
 		delete allocated_assembly;
+	}
+
+	for (auto& placeholder : Loader::alloced_generic_placeholders)
+	{
+		delete placeholder;
 	}
 
 	return retcode;

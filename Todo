@@ -8,3 +8,11 @@
 - add methodinvoke for non win64 systems
 - add gc logic which searches thru arrays (and spans in the future)
 - allow methods to be void
+- change some reinterpret casts in stdlib to normal casts
+- exceptions
+- add inheritance and generic type parsing from metadata
+	- interface implementation
+- add runtime member reordering for runtime inheritance once dynamic type generation is allowed
+- dynamic generic type generation
+- add destructor loading
+- have loader support all valid modifiers for different attributes

@@ -2,7 +2,7 @@
 
 namespace ULR
 {
-	PropertyInfo::PropertyInfo(char* name, bool is_static, MethodInfo* getter, MethodInfo* setter, int attrs)
+	PropertyInfo::PropertyInfo(char* name, bool is_static, Type* valtype, MethodInfo* getter, MethodInfo* setter, int attrs, bool is_generic)
 	{
 		this->decl_type = MemberType::Property;
 		this->name = name;
@@ -10,6 +10,8 @@ namespace ULR
 		this->getter = getter;
 		this->setter = setter;
 		this->attrs = attrs;
+		this->is_empty_generic = is_generic;
+		this->valtype = valtype;
 	}
 
 	PropertyInfo::~PropertyInfo()

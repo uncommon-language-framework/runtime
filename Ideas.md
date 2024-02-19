@@ -21,7 +21,9 @@ MyAssembly.dll
 		- partial -> `l`
 		- extern -> `e`
 		- sealed -> `d`
-		- struct - `v`
+		- struct -> `v`
+		- for prop - get -> `g`
+		- for prop - set -> `w`
 		- add more or delete some unnecessary ones...
 	- Note `System.Array<T>` is generic because we are using the C Blunt stdlib
 - `int ulraddr[]` global variable contains member addrs from their respective offsets (if static member -> then there is no offset, if instance member, then the offset is from the base of the object ptr)
