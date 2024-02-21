@@ -1,10 +1,15 @@
 #define __ULR_MANAGED
+#define ULR_EXPORT extern "C"
+#define BEGIN_ULR_EXPORT ULR_EXPORT {
+#define END_ULR_EXPORT }
 
 #include "../Assembly.hpp"
 #include "../Resolver.hpp"
 
 #pragma once
 
+using ULR::Type;
+using ULR::Assembly;
 using ULR::Resolver::ULRAPIImpl;
 
 

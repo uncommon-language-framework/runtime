@@ -21,4 +21,16 @@ namespace ULR
 		delete getter;
 		delete setter;
 	}
+
+	// assumes that it has a getter
+	char* PropertyInfo::GetValue(char* self)
+	{
+		return this->getter->Invoke(self, std::vector<char*>());
+	}
+
+	// assumes that it has a setter
+	void PropertyInfo::SetValue(char* self, char* value)
+	{
+		this->setter->Invoke(self, { value });
+	}
 }

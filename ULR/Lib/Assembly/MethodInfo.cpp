@@ -20,7 +20,7 @@ namespace ULR
 		free(name);
 	}
 
-void* MethodInfo::Invoke(void* self, std::vector<void*> args)
+	char* MethodInfo::Invoke(char* self, std::vector<char*> args)
 	{
 	/* This internal invoke method assumes correct types and length for `args`. 
 		The stdlib wrapper implementation should validate `args` and `self` this 
@@ -161,7 +161,7 @@ void* MethodInfo::Invoke(void* self, std::vector<void*> args)
 				
 				memcpy(boxedret+1, &ret, rettype->size); // this should copy the lower x bytes where the value is stored
 
-				return boxedret;
+				return (char*) boxedret;
 			}
 
 
@@ -247,7 +247,7 @@ void* MethodInfo::Invoke(void* self, std::vector<void*> args)
 					:"rax", "rcx", "rdx", "r8", "r9", "r10", "r11", "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5"
 				);
 			
-			return boxedret;
+			return (char*) boxedret;
 		}
 		else
 		{
@@ -339,7 +339,7 @@ void* MethodInfo::Invoke(void* self, std::vector<void*> args)
 					:"rax", "rcx", "rdx", "r8", "r9", "r10", "r11", "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5"
 				);
 
-			return ret;
+			return (char*) ret;
 		}
 
 		#else

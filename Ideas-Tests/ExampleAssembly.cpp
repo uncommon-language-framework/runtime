@@ -1,11 +1,10 @@
 #include <iostream>
 #include "../ULR/Lib/Public/StdULR.hpp"
 
-using ULR::Type;
-
 ULRAPIImpl* api = nullptr;
 
 Type* CachedProgramType;
+Type* CachedExceptionType;
 
 extern "C"
 {
@@ -15,16 +14,31 @@ extern "C"
 		{0, 0},
 		{0, 1}
 	};
-	
+
+	char* (*special_exception_prep_for_throw)(char* self, char* native_stacktrace, void* current_func);
+	void (*overload0_ns1_System_Exception_ctor)(char* self);
+	void (*overload1_ns1_System_Exception_ctor)(char* self, char* msg);
+	char* (*special_string_MAKE_FROM_LITERAL)(const char16_t* str, int len);
+
 
 	void InitAssembly(ULRAPIImpl* ulr)
 	{
 		api = ulr;
 		internal_api = ulr;
 		CachedProgramType = api->GetType("[]Program", "ExampleAssembly.dll");
+		CachedExceptionType = api->GetType("[System]Exception", "System.Runtime.Native.dll");
+	
+		/* Load Stdlib Static References */
+
+		Assembly* stdlib = api->LocateAssembly("System.Runtime.Native.dll");
+
+		special_exception_prep_for_throw = (char* (*)(char*, char*, void*)) api->LocateSymbol(stdlib, "special_exception_prep_for_throw");
+		overload0_ns1_System_Exception_ctor = (void (*)(char*)) api->LocateSymbol(stdlib, "overload0_ns1_System_Exception_ctor");
+		overload1_ns1_System_Exception_ctor = (void (*)(char*, char*)) api->LocateSymbol(stdlib, "overload1_ns1_System_Exception_ctor");
+		special_string_MAKE_FROM_LITERAL = (char* (*)(const char16_t*, int)) api->LocateSymbol(stdlib, "special_string_MAKE_FROM_LITERAL");
 	}
 
-	void ns0_Program_ctor(void* self /* rest of args... */)
+	void ns0_Program_ctor(char* self /* rest of args... */)
 	{
 
 	}
@@ -39,13 +53,24 @@ extern "C"
 
 		// return ns1_System_Int32_ctor(0);
 
-		void* obj = api->ConstructObject(ns0_Program_ctor, CachedProgramType);
+
+		char* obj = api->ConstructObject(ns0_Program_ctor, CachedProgramType);
 		ulrlocals[0] = obj;
 
 		std::cout << "Hello from ExampleAssembly" << std::endl;
 
 		Type* typeofobj = api->GetTypeOf(obj);
 		std::cout << "Type of obj: " << typeofobj->name << " (" << typeofobj->assembly->name << ')' << std::endl;
+
+		throw special_exception_prep_for_throw(
+			api->ConstructObject(
+				overload1_ns1_System_Exception_ctor,
+				CachedExceptionType,
+				special_string_MAKE_FROM_LITERAL(u"uh-oh exception", 15)
+			),
+			"Native stacktrace",
+			nullptr
+		);
 
 		ulrlocals[0] = nullptr;
 
@@ -56,7 +81,7 @@ extern "C"
 	// [] -> no namespace
 	// Program -> classname
 	// $4 -> takes four bytes (4 byte pointer to actual type)
-	char ulrmeta[] = "pc[]Program:[System]Object$8;.ctor p();.entr s[System]Int32 Main();\n"
+	char ulrmeta[] = "pc[]Program:[System]Object,$8;.ctor p();.entr s[System]Int32 Main();\n"
 	""
 	"";
 

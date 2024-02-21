@@ -19,6 +19,12 @@ namespace ULR::Loader
 		char* meta = (char*) GetProcAddress(mod, "ulrmeta");
 		void** addr = (void**) GetProcAddress(mod, "ulraddr");
 
+		if (meta == nullptr || addr == nullptr)
+		{
+			std::wcout << "fatal: lib "  << dll << " failed to load";
+			exit(1);
+		}
+
 		size_t metalen = strlen(meta);
 
 		std::string as_str = dll;
@@ -29,7 +35,7 @@ namespace ULR::Loader
 			meta,
 			metalen,
 			addr,
-			(void**) GetProcAddress(mod, "ulrlocals"),
+			(char**) GetProcAddress(mod, "ulrlocals"),
 			(size_t) GetProcAddress(mod, "ulrlocalslen"),
 			(size_t**) GetProcAddress(mod, "ulrlocalsmapping"),
 			mod
@@ -97,7 +103,7 @@ namespace ULR::Loader
 
 			int typename_len = 0;
 
-			while (meta[i] != ':' || meta[i] != '<')
+			while (meta[i] != ':' && meta[i] != '<')
 			{
 				typename_len++;
 				i++;
@@ -180,7 +186,7 @@ namespace ULR::Loader
 
 			int typename_len = 0;
 
-			while (meta[i] != ':' || meta[i] != '<')
+			while (meta[i] != ':' && meta[i] != '<')
 			{
 				typename_len++;
 				i++;
@@ -199,7 +205,7 @@ namespace ULR::Loader
 
 				while (1)
 				{
-					while (meta[i] != ',' || meta[i] != '>')
+					while (meta[i] != ',' && meta[i] != '>')
 					{
 						i++;
 					}
@@ -211,7 +217,7 @@ namespace ULR::Loader
 					i++;
 				}
 
-				i++;
+				i+=2; // skip '>' and ':'
 			}
 
 			int base_len = 0;
@@ -237,15 +243,18 @@ namespace ULR::Loader
 			{
 				int intfc_len = 0;
 				
-				while (meta[i] != ',' || meta[i] != '$')
+				while (meta[i] != ',' && meta[i] != '$')
 				{
 					intfc_len++;
 					i++;
 				}
 
-				interfaces.emplace_back(
-					GetType(const_cast<char*>(std::string(&meta[i-intfc_len], intfc_len).c_str()))
-				);
+				if (intfc_len != 0)
+				{
+					interfaces.emplace_back(
+						GetType(const_cast<char*>(std::string(&meta[i-intfc_len], intfc_len).c_str()))
+					);
+				}
 				
 				if (meta[i] == '$') break;
 
@@ -320,7 +329,7 @@ namespace ULR::Loader
 
 						nummember++;
 
-						while (meta[i] != '[' || meta[i] != 'T')
+						while (meta[i] != '[' && meta[i] != 'T')
 						{
 							char chr = meta[i];
 
@@ -387,7 +396,7 @@ namespace ULR::Loader
 
 						nummember++;
 
-						while (meta[i] != '[' || meta[i] != 'T')
+						while (meta[i] != '[' && meta[i] != 'T')
 						{
 							char chr = meta[i];
 
@@ -464,7 +473,7 @@ namespace ULR::Loader
 
 						nummember++;
 
-						while (meta[i] != '[' || meta[i] != 'T')
+						while (meta[i] != '[' && meta[i] != 'T')
 						{
 							char chr = meta[i];
 
@@ -581,7 +590,7 @@ namespace ULR::Loader
 
 				nummember++;
 
-				while (meta[i] != '[' || meta[i] != 'T')
+				while (meta[i] != '[' && meta[i] != 'T')
 				{
 					char chr = meta[i];
 
@@ -607,9 +616,9 @@ namespace ULR::Loader
 					i++;
 				}
 
-				i++;
+				// i++; // intentionally left out to grab prev bracket/'T'
 
-				int full_typename_len = 1; // intentional to grab prev bracket/'T'
+				int full_typename_len = 0;
 
 				while (meta[i] != ' ')
 				{

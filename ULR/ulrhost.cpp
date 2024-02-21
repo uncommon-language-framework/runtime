@@ -56,7 +56,7 @@ int main(int argc, char* argv[])
 	int retcode;
 	
 	try { retcode = mainasm->entry(); }
-	catch (void* exc)
+	catch (char* exc)
 	{
 		Type* SystemException = lclapi.GetTypeOf(exc); // OR GetType("[System]Exception", "System.Runtime.Native.dll")
 
@@ -64,11 +64,8 @@ int main(int argc, char* argv[])
 		PropertyInfo* MessageProperty = lclapi.GetProperty(SystemException, "Message", BindingFlags::Instance | BindingFlags::Public);
 
 		// These are both System_Strings
-		// void* stacktrace = StackTraceProperty->GetValue(exc);
-		// void* message = MessageProperty->GetValue(exc);
-
-		void* stacktrace = nullptr;
-		void* message = nullptr;
+		void* stacktrace = StackTraceProperty->GetValue(exc);
+		void* message = MessageProperty->GetValue(exc);
 
 		// extract char16_t from strings
 

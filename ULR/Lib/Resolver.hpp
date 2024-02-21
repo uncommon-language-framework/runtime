@@ -39,7 +39,7 @@ namespace ULR::Resolver
 		size_t prev_size_accessible = 0;
 
 		public:
-			std::map<void*, size_t> allocated_objs;
+			std::map<char*, size_t> allocated_objs;
 			size_t allocated_size = 0;
 
 			ULRAPIImpl(
@@ -51,6 +51,8 @@ namespace ULR::Resolver
 
 			bool EnsureLoaded(char assembly_name[]);
 			Assembly* LoadAssembly(char assembly_name[]);
+			Assembly* LocateAssembly(char assembly_name[]);
+			void* LocateSymbol(Assembly* assembly, char symbol_name[]);
 
 			std::vector<MemberInfo*> GetMember(Type* type, char name[]);
 
@@ -63,21 +65,21 @@ namespace ULR::Resolver
 			
 			Type* GetType(char full_qual_typename[]);
 			Type* GetType(char full_qual_typename[], char assembly_hint[]);
-			Type* GetTypeOf(void* obj);
+			Type* GetTypeOf(char* obj);
 			
-			void* AllocateObject(size_t size);
-			void* AllocateZeroed(size_t size);
-			void* AllocateObjectNoGC(size_t size);
-			void* AllocateZeroedNoGC(size_t size);
+			char* AllocateObject(size_t size);
+			char* AllocateZeroed(size_t size);
+			char* AllocateObjectNoGC(size_t size);
+			char* AllocateZeroedNoGC(size_t size);
 			
 			template <typename... Args>
-				void* ConstructObject(
-					void (*Constructor)(void* obj, Args... args),
+				char* ConstructObject(
+					void (*Constructor)(char* obj, Args... args),
 					Type* typeptr,
 					Args... args
 				)
 			{
-				void* obj = AllocateObject(typeptr->size);
+				char* obj = AllocateObject(typeptr->size);
 
 				Type** obj_for_type_place = reinterpret_cast<Type**>(obj);
 
@@ -88,12 +90,12 @@ namespace ULR::Resolver
 				return obj;
 			}
 
-			std::set<void*> ExamineRoot(void* root);
-			std::set<void*> ExamineRoots(std::set<void*> roots);
+			std::set<char*> ExamineRoot(char* root);
+			std::set<char*> ExamineRoots(std::set<char*> roots);
 			GCResult Collect();
 
 			template <typename ValueType>
-			void* Box(ValueType& obj, Type* typeptr)
+			char* Box(ValueType& obj, Type* typeptr)
 			{
 				Type** boxed = (Type**) AllocateObject(sizeof(Type*)+sizeof(ValueType));
 
@@ -103,11 +105,11 @@ namespace ULR::Resolver
 
 				obj_for_val_place[0] = obj;
 
-				return boxed;
+				return (char*) boxed;
 			}
 
 			template <typename ValueType>
-			ValueType UnBox(void* boxed)
+			ValueType UnBox(char* boxed)
 			{
 				return *(
 					(ValueType*) (

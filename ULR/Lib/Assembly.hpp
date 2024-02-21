@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <cstring>
 #include <functional>
+#include <unordered_map>
 
 #pragma once
 
@@ -142,7 +143,7 @@ namespace ULR
 			MethodInfo(char* name, bool is_static, std::vector<Type*> argsig, Type* rettype, void* offset, int attrs, bool is_generic, char* generic_llir = nullptr);
 			~MethodInfo();
 
-			void* Invoke(void* self, std::vector<void*> args); // Invoke, GetPointer, and the like have to be defined in the header so that they can be accessible by compilations
+			char* Invoke(char* self, std::vector<char*> args); // Invoke, GetPointer, and the like have to be defined in the header so that they can be accessible by compilations
 		};
 
 	class ConstructorInfo : public MemberInfo
@@ -170,7 +171,7 @@ namespace ULR
 			
 			DestructorInfo(void* offset, int attrs, bool is_generic, char* generic_llir = nullptr);
 
-			void Invoke(void* obj)
+			void Invoke(void* obj) // TODO: move impl to ULR.NativeLib src files
 			{
 				if (IsBoxableStruct(parent_type))
 				{
@@ -192,8 +193,8 @@ namespace ULR
 			FieldInfo(char* name, bool is_static, void* offset, Type* valtype, int attrs, bool is_generic);
 			~FieldInfo();
 			
-			void* GetValue(void* self);
-			void SetValue(void* self, void* value);
+			char* GetValue(char* self);
+			void SetValue(char* self, char* value);
 	};
 
 	class PropertyInfo : public MemberInfo
@@ -206,8 +207,8 @@ namespace ULR
 			PropertyInfo(char* name, bool is_static, Type* valtype, MethodInfo* getter, MethodInfo* setter, int attrs, bool is_generic);
 			~PropertyInfo();
 
-			void* GetValue(void* inst);
-			void SetValue(void* inst, void* value);
+			char* GetValue(char* inst);
+			void SetValue(char* inst, char* value);
 
 	};
 
@@ -219,13 +220,14 @@ namespace ULR
 			char* meta;
 			size_t metalen;
 			void** addr;
-			void** locals;
+			char** locals;
 			size_t localslen;
 			size_t** localsmapping;
 			int (*entry)() = NULL;
 			std::map<char*, Type*, cmp_chr_ptr> types;
+			std::unordered_map<std::string_view, void*> cached_sym_lookups;
 
-			Assembly(char* name, char* meta, size_t metalen, void** addr, void** locals, size_t localslen, size_t** localsmapping, HMODULE handle);
+			Assembly(char* name, char* meta, size_t metalen, void** addr, char** locals, size_t localslen, size_t** localsmapping, HMODULE handle);
 			~Assembly();
 	};
 }

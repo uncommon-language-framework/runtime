@@ -21,13 +21,13 @@ namespace ULR
 	}
 
 	// assume that the arg types are valid
-	void* FieldInfo::GetValue(void* self)
+	char* FieldInfo::GetValue(char* self)
 	{
 		if (valtype->decl_type != TypeType::Struct)
 		{
-			if (is_static) return *((void**) offset);
+			if (is_static) return *((char**) offset);
 		
-			return *(void**) (((char*) self)+((size_t) offset));
+			return *(char**) (((char*) self)+((size_t) offset));
 		}
 
 		void* objstart;
@@ -42,11 +42,11 @@ namespace ULR
 
 		memcpy(boxed+1, objstart, objsize);
 
-		return boxed;
+		return (char*) boxed;
 	}
 
 	// as always, we assume that the types are correct
-	void FieldInfo::SetValue(void* self, void* value)
+	void FieldInfo::SetValue(char* self, char* value)
 	{
 		if (valtype->decl_type != TypeType::Struct)
 		{

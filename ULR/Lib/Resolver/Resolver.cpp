@@ -42,6 +42,28 @@ namespace ULR::Resolver
 		return LoadAssemblyPtr(assembly_name, this);
 	}
 
+	Assembly* ULRAPIImpl::LocateAssembly(char assembly_name[])
+	{
+		if (read_assemblies->count(assembly_name) != 0) return (*read_assemblies)[assembly_name];
+
+		return (*assemblies)[assembly_name];
+	}
+
+	void* ULRAPIImpl::LocateSymbol(Assembly* assembly, char symbol_name[])
+	{
+		std::string_view cache_key = symbol_name;
+
+		if (assembly->cached_sym_lookups.count(cache_key)) return assembly->cached_sym_lookups[cache_key];
+
+		HMODULE mod = assembly->handle;
+
+		void* addr = (void*) GetProcAddress(mod, symbol_name);
+
+		if (addr) assembly->cached_sym_lookups[cache_key] = addr;
+
+		return addr;
+	}
+
 	std::vector<MemberInfo*> ULRAPIImpl::GetMember(Type* type, char name[])
 	{
 		std::vector<MemberInfo*> matches = type->static_attrs[name];
@@ -214,52 +236,52 @@ namespace ULR::Resolver
 		throw std::runtime_error("second fault") /* new TypeNotFound exc */;
 	}
 
-	Type* ULRAPIImpl::GetTypeOf(void* obj)
+	Type* ULRAPIImpl::GetTypeOf(char* obj)
 	{
 		Type** type_ptr_extract = reinterpret_cast<Type**>(obj);
 
 		return type_ptr_extract[0];
 	}
 	
-	void* ULRAPIImpl::AllocateObject(size_t size)
+	char* ULRAPIImpl::AllocateObject(size_t size)
 	{
 		if (allocated_size+size > GC_TRIGGER_SIZE && ((allocated_size+size) - prev_size_accessible) > 10 MB) Collect();
 
 		return AllocateObjectNoGC(size);
 	}
 
-	void* ULRAPIImpl::AllocateZeroed(size_t size)
+	char* ULRAPIImpl::AllocateZeroed(size_t size)
 	{
 		if (allocated_size+size > GC_TRIGGER_SIZE && ((allocated_size+size) - prev_size_accessible) > 10 MB) Collect();
 
 		return AllocateZeroedNoGC(size);
 	}
 
-	void* ULRAPIImpl::AllocateObjectNoGC(size_t size)
+	char* ULRAPIImpl::AllocateObjectNoGC(size_t size)
 	{
-		void* mem = malloc(size);
+		char* mem = (char*) malloc(size);
 
 		allocated_objs.emplace(mem, size);
 
 		allocated_size+=size;
 
-		return mem;
+		return (char*) mem;
 	}
 
-	void* ULRAPIImpl::AllocateZeroedNoGC(size_t size)
+	char* ULRAPIImpl::AllocateZeroedNoGC(size_t size)
 	{
-		void* mem = calloc(size, 1);
+		char* mem = (char*) calloc(size, 1);
 
 		allocated_objs.emplace(mem, size);
 
 		allocated_size+=size;
 		
-		return mem;
+		return (char*) mem;
 	}
 
-	std::set<void*> ULRAPIImpl::ExamineRoot(void* root)
+	std::set<char*> ULRAPIImpl::ExamineRoot(char* root)
 	{
-		std::set<void*> found = { root };
+		std::set<char*> found = { root };
 
 		Type* root_type = GetTypeOf(root);
 
@@ -269,7 +291,7 @@ namespace ULR::Resolver
 			{
 				FieldInfo* field = (FieldInfo*) entry.second[0];
 
-				void* fieldval = field->GetValue(root);
+				char* fieldval = field->GetValue(root);
 
 				if (found.count(fieldval)) continue; // prevent circular refs
 
@@ -282,9 +304,9 @@ namespace ULR::Resolver
 		return found;
 	}
 
-	std::set<void*> ULRAPIImpl::ExamineRoots(std::set<void*> roots)
+	std::set<char*> ULRAPIImpl::ExamineRoots(std::set<char*> roots)
 	{
-		std::set<void*> total;
+		std::set<char*> total;
 
 		for (auto& root : roots)
 		{
@@ -300,7 +322,7 @@ namespace ULR::Resolver
 
 	GCResult ULRAPIImpl::Collect()
 	{
-		std::set<void*> roots; // aggregate a list of all registered locals
+		std::set<char*> roots; // aggregate a list of all registered locals
 
 		for (auto& entry : *assemblies)
 		{
@@ -308,7 +330,7 @@ namespace ULR::Resolver
 			// add local var addrs to roots
 			for (size_t i = 0; i < entry.second->localslen; i++)
 			{
-				void* lcladdr = entry.second->locals[i];
+				char* lcladdr = entry.second->locals[i];
 
 				if (lcladdr == nullptr) continue;
 
@@ -322,13 +344,13 @@ namespace ULR::Resolver
 				{
 					if (static_entry.second[0]->decl_type == MemberType::Field)
 					{
-						roots.emplace(((FieldInfo*) static_entry.second[0])->offset);
+						roots.emplace(((FieldInfo*) static_entry.second[0])->GetValue(nullptr));
 					}
 				}
 			}
 		}
 
-		std::set<void*> still_accessible = ExamineRoots(roots);
+		std::set<char*> still_accessible = ExamineRoots(roots);
 
 		GCResult result;
 

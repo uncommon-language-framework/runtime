@@ -16,3 +16,4 @@
 - dynamic generic type generation
 - add destructor loading
 - have loader support all valid modifiers for different attributes
+- add static ctor support
