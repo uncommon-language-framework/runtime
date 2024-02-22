@@ -35,12 +35,30 @@ namespace ULR
 	void Type::AddStaticMember(MemberInfo* member)
 	{
 		member->parent_type = this;
+
+		if (member->decl_type == MemberType::Property)
+		{
+			PropertyInfo* as_prop = (PropertyInfo*) member;
+
+			if (as_prop->getter) as_prop->getter->parent_type = this;
+			if (as_prop->setter) as_prop->setter->parent_type = this;
+		}
+
 		static_attrs[member->name].emplace_back(member);
 	}
 
 	void Type::AddInstanceMember(MemberInfo* member)
 	{
 		member->parent_type = this;
+
+		if (member->decl_type == MemberType::Property)
+		{
+			PropertyInfo* as_prop = (PropertyInfo*) member;
+
+			if (as_prop->getter) as_prop->getter->parent_type = this;
+			if (as_prop->setter) as_prop->setter->parent_type = this;
+		}
+
 		inst_attrs[member->name].emplace_back(member);
 	}
 

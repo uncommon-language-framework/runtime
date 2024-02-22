@@ -23,6 +23,7 @@ g++64 -shared -o "ULR.NativeLib.dll" *.o $llvmlibsdir $llvmlibs $winlibs
 
 Remove-Item *.o
 Copy-Item "ULR.NativeLib.dll" "../Ideas-Tests/ULR.NativeLib.dll"
+Copy-Item "ULR.NativeLib.dll" "../../ulflib/src/native/ULR.NativeLib.dll"
 
 if ($args[0] -eq "debug")
 {
@@ -32,3 +33,6 @@ else
 {
 	g++64 "ulrhost.cpp" "ULR.NativeLib.dll" "Lib/Loader/Loader.cpp" -o ulrhost.exe -masm=intel -Wno-write-strings -std=c++17
 }
+
+$env:MALLOC_CHECK_=2
+$env:MALLOC_TRACE=./malloc_hist

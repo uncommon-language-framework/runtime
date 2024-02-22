@@ -69,10 +69,10 @@ int main(int argc, char* argv[])
 
 		// extract char16_t from strings
 
-		int message_len = *((int*) ((char*) message)+sizeof(Type*)); // we don't need stacktrace len because it will never have a null char
+		int message_len = *((int*) (((char*) message)+sizeof(Type*))); // we don't need stacktrace len because it will never have a null char
 
-		char16_t* stacktrace_cstr = (char16_t*) ((char*) stacktrace)+sizeof(Type*)+sizeof(int);
-		char16_t* message_cstr = (char16_t*) ((char*) message)+sizeof(Type*)+sizeof(int);
+		char16_t* stacktrace_cstr = (char16_t*) (((char*) stacktrace)+sizeof(Type*)+sizeof(int));
+		char16_t* message_cstr = (char16_t*) (((char*) message)+sizeof(Type*)+sizeof(int));
 
 		std::u16string stacktrace_cppstr = stacktrace_cstr;
 		std::u16string message_cppstr(message_cstr, message_len);
@@ -87,8 +87,8 @@ int main(int argc, char* argv[])
 			<< converter.to_bytes(message_cppstr)
 			<< " ---- Stacktrace: "
 			<< converter.to_bytes(stacktrace_cppstr);
-
-		return 1;
+		
+		retcode = 1;
 	}
 	
 	// Final deallocation and cleanup (of ULR objects and the allocated assemblies)

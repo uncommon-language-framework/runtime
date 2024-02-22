@@ -62,13 +62,17 @@ extern "C"
 		Type* typeofobj = api->GetTypeOf(obj);
 		std::cout << "Type of obj: " << typeofobj->name << " (" << typeofobj->assembly->name << ')' << std::endl;
 
+		char* exc = api->ConstructObject(
+			overload1_ns1_System_Exception_ctor,
+			CachedExceptionType,
+			special_string_MAKE_FROM_LITERAL(u"uh-oh exception", 15)
+		);
+
+		// std::cout << (void*) exc << std::endl;
+
 		throw special_exception_prep_for_throw(
-			api->ConstructObject(
-				overload1_ns1_System_Exception_ctor,
-				CachedExceptionType,
-				special_string_MAKE_FROM_LITERAL(u"uh-oh exception", 15)
-			),
-			"Native stacktrace",
+			exc,
+			"Native stacktrace not implemented yet",
 			nullptr
 		);
 

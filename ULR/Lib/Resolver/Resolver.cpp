@@ -265,7 +265,7 @@ namespace ULR::Resolver
 
 		allocated_size+=size;
 
-		return (char*) mem;
+		return mem;
 	}
 
 	char* ULRAPIImpl::AllocateZeroedNoGC(size_t size)
@@ -276,7 +276,7 @@ namespace ULR::Resolver
 
 		allocated_size+=size;
 		
-		return (char*) mem;
+		return mem;
 	}
 
 	std::set<char*> ULRAPIImpl::ExamineRoot(char* root)
