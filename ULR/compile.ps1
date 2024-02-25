@@ -1,7 +1,7 @@
 $libfiles = [System.Collections.Generic.List[string]]::new()
 $llvmlibs = (llvm-config --libs).Split()
 $llvmlibsdir = "-L$(llvm-config --libdir)"
-$winlibs = "-lole32", "-luuid"
+$winlibs = "-lole32", "-luuid", "-ldbghelp"
 
 foreach ($item in Get-ChildItem ./Lib -File -Recurse)
 {
@@ -27,12 +27,9 @@ Copy-Item "ULR.NativeLib.dll" "../../ulflib/src/native/ULR.NativeLib.dll"
 
 if ($args[0] -eq "debug")
 {
-	g++64 "ulrhost.cpp" "ULR.NativeLib.dll" "Lib/Loader/Loader.cpp" -o ulrhost.exe -masm=intel -O0 -Wall -g -D DEBUG=true -Wno-write-strings -std=c++17
+	g++64 "ulrhost.cpp" "ULR.NativeLib.dll" "Lib/Loader/Loader.cpp" -o ulrhost.exe -masm=intel -O0 -Wall -g -D DEBUG=true -Wno-write-strings -std=c++17 -ldbghelp
 }
 else
 {
-	g++64 "ulrhost.cpp" "ULR.NativeLib.dll" "Lib/Loader/Loader.cpp" -o ulrhost.exe -masm=intel -Wno-write-strings -std=c++17
+	g++64 "ulrhost.cpp" "ULR.NativeLib.dll" "Lib/Loader/Loader.cpp" -o ulrhost.exe -masm=intel -Wno-write-strings -std=c++17 -ldbghelp
 }
-
-$env:MALLOC_CHECK_=2
-$env:MALLOC_TRACE=./malloc_hist

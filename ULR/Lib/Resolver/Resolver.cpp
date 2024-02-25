@@ -1,4 +1,6 @@
 #include "../Resolver.hpp"
+#include <dbghelp.h>
+#include <sstream>
 
 namespace ULR::Resolver
 {
@@ -380,5 +382,182 @@ namespace ULR::Resolver
 		prev_size_accessible = allocated_size;
 
 		return result;
+	}
+
+	MemberInfo* ULRAPIImpl::ResolveAddressToMember(void* addr)
+	{
+		for (auto& entry : *assemblies)
+		{
+			for (auto& type_entry : entry.second->types)
+			{
+				for (auto& member_entry : type_entry.second->inst_attrs)
+				{
+					if (
+						member_entry.second[0]->decl_type == MemberType::Field ||
+						member_entry.second[0]->decl_type == MemberType::Property)
+							continue;
+					
+					for (auto& member : member_entry.second)
+					{
+						if (member->decl_type == MemberType::Method && ((MethodInfo*) member)->offset == addr) return member;
+						if (member->decl_type == MemberType::Ctor && ((MethodInfo*) member)->offset == addr) return member;
+						if (member->decl_type == MemberType::Dtor && ((MethodInfo*) member)->offset == addr) return member;
+					}
+				}
+
+				for (auto& member_entry : type_entry.second->static_attrs)
+				{
+					if (
+						member_entry.second[0]->decl_type == MemberType::Field ||
+						member_entry.second[0]->decl_type == MemberType::Property)
+							continue;
+					
+					for (auto& member : member_entry.second)
+					{
+						if (member->decl_type == MemberType::Method && ((MethodInfo*) member)->offset == addr) return member;
+						if (member->decl_type == MemberType::Ctor && ((MethodInfo*) member)->offset == addr) return member;
+						if (member->decl_type == MemberType::Dtor && ((MethodInfo*) member)->offset == addr) return member;
+					}
+				}
+			}
+		}
+
+		return nullptr;
+	}
+
+	std::string ULRAPIImpl::GetFullyQualifiedNameOf(MemberInfo* member)
+	{
+		std::string base = GetDisplayNameOf(member->parent_type);
+
+		base.push_back('.');
+		base.append(member->name);
+
+		return base;
+	}
+
+	std::string ULRAPIImpl::GetDisplayNameOf(Type* type)
+	{
+		std::string dispname = type->name;
+
+		if (dispname.find("[]") != std::string::npos)
+		{
+			dispname.erase(0, 2);
+
+			return dispname;
+		}
+
+		dispname.erase(0, 1);
+		
+		dispname.replace(dispname.find(']'), 1, ".");
+
+		return dispname;
+	}
+
+	std::string ULRAPIImpl::GetDisplayNameOf(MemberInfo* member)
+	{
+		std::string base_display = GetFullyQualifiedNameOf(member);
+
+		if (member->decl_type == MemberType::Field)
+		{
+			base_display.insert(base_display.begin(), ' ');
+			base_display.insert(0, GetDisplayNameOf(((FieldInfo*) member)->valtype));
+			
+			return base_display;
+		}
+
+		if (member->decl_type == MemberType::Property)
+		{
+			base_display.insert(base_display.begin(), ' ');
+			base_display.insert(0, GetDisplayNameOf(((PropertyInfo*) member)->valtype));
+			
+			return base_display;
+		}
+
+		if (member->decl_type == MemberType::Dtor)
+		{
+			base_display.append("()");
+
+			return base_display;
+		}
+
+		if (member->decl_type == MemberType::Ctor)
+		{
+			base_display.push_back('(');
+
+			for (auto& arg : ((ConstructorInfo*) member)->signature)
+			{
+				base_display.append(GetDisplayNameOf(arg));
+				base_display.append(", ");
+			}
+
+			base_display.erase(base_display.size()-2);
+			base_display.push_back(')');
+
+			return base_display;
+		}
+
+		if (member->decl_type == MemberType::Method)
+		{
+			base_display.insert(base_display.begin(), ' ');
+			base_display.insert(0, GetDisplayNameOf(((MethodInfo*) member)->rettype));
+
+			base_display.insert(base_display.end(), '(');
+
+			for (auto& arg : ((MethodInfo*) member)->argsig)
+			{
+				base_display.append(GetDisplayNameOf(arg));
+				base_display.append(", ");
+			}
+
+			if (((MethodInfo* ) member)->argsig.size() != 0) base_display.erase(base_display.size()-2);
+			
+			base_display.insert(base_display.end(), ')');
+
+			return base_display;
+		}
+
+		return "invalid member type";
+	}
+	
+	std::string ULRAPIImpl::GetStackTrace(int skipframes)
+	{
+		std::string bt_str("\n");
+
+		bt_str.reserve(MAX_TRACEBACK*20);
+
+		void* bt[MAX_TRACEBACK];
+
+		HANDLE proc = GetCurrentProcess();
+
+		SymInitialize(proc, NULL, true);
+
+		unsigned short num_frames = CaptureStackBackTrace(1+skipframes, MAX_TRACEBACK, bt, NULL);
+
+		for (int i = 0; i < num_frames; i++)
+		{
+			IMAGEHLP_SYMBOL64 info;
+
+			if (!SymGetSymFromAddr(proc, (DWORD64) bt[i], NULL, &info)) break;
+
+			void* funcaddr = (void*) info.Address;
+
+			MemberInfo* member = ResolveAddressToMember(funcaddr);
+			
+			if (!member) break;
+
+			std::stringstream fmt_ptr;
+
+			fmt_ptr << std::hex << bt[i];
+
+			bt_str.append("in ");
+			bt_str.append(
+				GetDisplayNameOf(member)
+			);
+			bt_str.append(" @ ");
+			bt_str.append(fmt_ptr.str());
+			bt_str.append("...\n");
+		}
+
+		return bt_str;
 	}
 }

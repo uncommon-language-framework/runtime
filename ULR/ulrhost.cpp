@@ -9,6 +9,7 @@
 #include <locale>
 #include <string>
 #include <Windows.h>
+#include <dbghelp.h>
 
 using namespace ULR;
 using namespace ULR::Resolver;
@@ -20,7 +21,7 @@ using precise_clock = std::chrono::steady_clock;
 
 
 int main(int argc, char* argv[])
-{
+{	
 	ULRAPIImpl lclapi = ULRAPIImpl( // perhaps refactor Loader into an object someday
 		&Loader::LoadedAssemblies,
 		&Loader::ReadAssemblies,
@@ -114,6 +115,8 @@ int main(int argc, char* argv[])
 	{
 		delete placeholder;
 	}
+
+	SymCleanup(GetCurrentProcess());
 
 	return retcode;
 }

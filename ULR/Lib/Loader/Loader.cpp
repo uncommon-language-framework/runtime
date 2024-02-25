@@ -352,9 +352,9 @@ namespace ULR::Loader
 							i++;
 						}
 
-						i++;
+						// i++; // intentional to grab prev bracket
 
-						int full_typename_len = 1; // intentional to grab prev bracket
+						int full_typename_len = 0; 
 
 						while (meta[i] != ' ')
 						{
@@ -363,6 +363,8 @@ namespace ULR::Loader
 						}
 
 						std::string full_rettype = std::string(&meta[i-full_typename_len], full_typename_len);
+
+						i++;
 
 						int name_len = 0;
 

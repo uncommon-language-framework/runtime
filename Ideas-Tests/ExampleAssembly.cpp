@@ -15,7 +15,7 @@ extern "C"
 		{0, 1}
 	};
 
-	char* (*special_exception_prep_for_throw)(char* self, char* native_stacktrace, void* current_func);
+	char* (*special_exception_prep_for_throw)(char* self);
 	void (*overload0_ns1_System_Exception_ctor)(char* self);
 	void (*overload1_ns1_System_Exception_ctor)(char* self, char* msg);
 	char* (*special_string_MAKE_FROM_LITERAL)(const char16_t* str, int len);
@@ -32,7 +32,7 @@ extern "C"
 
 		Assembly* stdlib = api->LocateAssembly("System.Runtime.Native.dll");
 
-		special_exception_prep_for_throw = (char* (*)(char*, char*, void*)) api->LocateSymbol(stdlib, "special_exception_prep_for_throw");
+		special_exception_prep_for_throw = (char* (*)(char*)) api->LocateSymbol(stdlib, "special_exception_prep_for_throw");
 		overload0_ns1_System_Exception_ctor = (void (*)(char*)) api->LocateSymbol(stdlib, "overload0_ns1_System_Exception_ctor");
 		overload1_ns1_System_Exception_ctor = (void (*)(char*, char*)) api->LocateSymbol(stdlib, "overload1_ns1_System_Exception_ctor");
 		special_string_MAKE_FROM_LITERAL = (char* (*)(const char16_t*, int)) api->LocateSymbol(stdlib, "special_string_MAKE_FROM_LITERAL");
@@ -62,6 +62,7 @@ extern "C"
 		Type* typeofobj = api->GetTypeOf(obj);
 		std::cout << "Type of obj: " << typeofobj->name << " (" << typeofobj->assembly->name << ')' << std::endl;
 
+
 		char* exc = api->ConstructObject(
 			overload1_ns1_System_Exception_ctor,
 			CachedExceptionType,
@@ -70,11 +71,7 @@ extern "C"
 
 		// std::cout << (void*) exc << std::endl;
 
-		throw special_exception_prep_for_throw(
-			exc,
-			"Native stacktrace not implemented yet",
-			nullptr
-		);
+		throw special_exception_prep_for_throw(exc);
 
 		ulrlocals[0] = nullptr;
 
