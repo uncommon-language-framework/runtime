@@ -8,7 +8,7 @@
 #define GB *(1000 MB)
 #define MAX_OBJ_SIZE 1 GB
 #define GC_TRIGGER_SIZE 2 GB
-#define MAX_TRACEBACK 10
+#define MAX_TRACEBACK 20
 
 #pragma once
 

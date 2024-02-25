@@ -400,8 +400,6 @@ namespace ULR::Resolver
 					for (auto& member : member_entry.second)
 					{
 						if (member->decl_type == MemberType::Method && ((MethodInfo*) member)->offset == addr) return member;
-						if (member->decl_type == MemberType::Ctor && ((MethodInfo*) member)->offset == addr) return member;
-						if (member->decl_type == MemberType::Dtor && ((MethodInfo*) member)->offset == addr) return member;
 					}
 				}
 
@@ -415,8 +413,8 @@ namespace ULR::Resolver
 					for (auto& member : member_entry.second)
 					{
 						if (member->decl_type == MemberType::Method && ((MethodInfo*) member)->offset == addr) return member;
-						if (member->decl_type == MemberType::Ctor && ((MethodInfo*) member)->offset == addr) return member;
-						if (member->decl_type == MemberType::Dtor && ((MethodInfo*) member)->offset == addr) return member;
+						if (member->decl_type == MemberType::Ctor && ((ConstructorInfo*) member)->offset == addr) return member;
+						if (member->decl_type == MemberType::Dtor && ((DestructorInfo*) member)->offset == addr) return member;
 					}
 				}
 			}
@@ -490,7 +488,8 @@ namespace ULR::Resolver
 				base_display.append(", ");
 			}
 
-			base_display.erase(base_display.size()-2);
+			if (((ConstructorInfo* ) member)->signature.size() != 0) base_display.erase(base_display.size()-2);
+			
 			base_display.push_back(')');
 
 			return base_display;
@@ -521,7 +520,7 @@ namespace ULR::Resolver
 	
 	std::string ULRAPIImpl::GetStackTrace(int skipframes)
 	{
-		std::string bt_str("\n");
+		std::string bt_str("\nmost recent frame >\n");
 
 		bt_str.reserve(MAX_TRACEBACK*20);
 
@@ -542,8 +541,30 @@ namespace ULR::Resolver
 			void* funcaddr = (void*) info.Address;
 
 			MemberInfo* member = ResolveAddressToMember(funcaddr);
-			
-			if (!member) break;
+		
+			if (!member)
+			{
+				if (i < num_frames-1)
+				{
+					// if next func is a ULR func
+
+					if (!SymGetSymFromAddr(proc, (DWORD64) bt[i+1], NULL, &info)) break;
+
+					MemberInfo* trymember = ResolveAddressToMember((void*) info.Address);
+
+					if (!trymember) break;
+
+					std::stringstream fmt_ptr;
+
+					fmt_ptr << std::hex << bt[i];
+
+					bt_str.append("in non-ULR-function (probably api->ConstructObject) @ ");
+					bt_str.append(fmt_ptr.str());
+					bt_str.append("...\n");
+
+					continue;
+				}
+			};
 
 			std::stringstream fmt_ptr;
 
@@ -557,6 +578,8 @@ namespace ULR::Resolver
 			bt_str.append(fmt_ptr.str());
 			bt_str.append("...\n");
 		}
+		
+		bt_str.append(" ^ outermost frame\n");
 
 		return bt_str;
 	}

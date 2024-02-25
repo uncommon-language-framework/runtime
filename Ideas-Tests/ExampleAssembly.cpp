@@ -40,7 +40,13 @@ extern "C"
 
 	void ns0_Program_ctor(char* self /* rest of args... */)
 	{
+		char* exc = api->ConstructObject(
+			overload1_ns1_System_Exception_ctor,
+			CachedExceptionType,
+			special_string_MAKE_FROM_LITERAL(L"uh-oh exception", 15)
+		);
 
+		throw special_exception_prep_for_throw(exc);
 	}
 
 	int ns0_Program_Main()
@@ -61,17 +67,6 @@ extern "C"
 
 		Type* typeofobj = api->GetTypeOf(obj);
 		std::cout << "Type of obj: " << typeofobj->name << " (" << typeofobj->assembly->name << ')' << std::endl;
-
-
-		char* exc = api->ConstructObject(
-			overload1_ns1_System_Exception_ctor,
-			CachedExceptionType,
-			special_string_MAKE_FROM_LITERAL(L"uh-oh exception", 15)
-		);
-
-		// std::cout << (void*) exc << std::endl;
-
-		throw special_exception_prep_for_throw(exc);
 
 		ulrlocals[0] = nullptr;
 
