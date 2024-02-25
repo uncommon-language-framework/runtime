@@ -18,7 +18,7 @@ extern "C"
 	char* (*special_exception_prep_for_throw)(char* self);
 	void (*overload0_ns1_System_Exception_ctor)(char* self);
 	void (*overload1_ns1_System_Exception_ctor)(char* self, char* msg);
-	char* (*special_string_MAKE_FROM_LITERAL)(const char16_t* str, int len);
+	char* (*special_string_MAKE_FROM_LITERAL)(const wchar_t* str, int len);
 
 
 	void InitAssembly(ULRAPIImpl* ulr)
@@ -35,7 +35,7 @@ extern "C"
 		special_exception_prep_for_throw = (char* (*)(char*)) api->LocateSymbol(stdlib, "special_exception_prep_for_throw");
 		overload0_ns1_System_Exception_ctor = (void (*)(char*)) api->LocateSymbol(stdlib, "overload0_ns1_System_Exception_ctor");
 		overload1_ns1_System_Exception_ctor = (void (*)(char*, char*)) api->LocateSymbol(stdlib, "overload1_ns1_System_Exception_ctor");
-		special_string_MAKE_FROM_LITERAL = (char* (*)(const char16_t*, int)) api->LocateSymbol(stdlib, "special_string_MAKE_FROM_LITERAL");
+		special_string_MAKE_FROM_LITERAL = (char* (*)(const wchar_t*, int)) api->LocateSymbol(stdlib, "special_string_MAKE_FROM_LITERAL");
 	}
 
 	void ns0_Program_ctor(char* self /* rest of args... */)
@@ -66,7 +66,7 @@ extern "C"
 		char* exc = api->ConstructObject(
 			overload1_ns1_System_Exception_ctor,
 			CachedExceptionType,
-			special_string_MAKE_FROM_LITERAL(u"uh-oh exception", 15)
+			special_string_MAKE_FROM_LITERAL(L"uh-oh exception", 15)
 		);
 
 		// std::cout << (void*) exc << std::endl;

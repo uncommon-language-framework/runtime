@@ -19,6 +19,19 @@ using precise_clock = std::chrono::steady_clock;
 
 #define get_duration_ms(duration) std::chrono::duration_cast<std::chrono::nanoseconds>(duration)
 
+std::wstring to_wstr(std::u16string str)
+{
+	std::wstring wstr;
+
+	wstr.reserve(str.size());
+
+	for (wchar_t c : str)
+	{
+		wstr.push_back((wchar_t) c);
+	}
+
+	return wstr;
+}
 
 int main(int argc, char* argv[])
 {	
@@ -68,26 +81,25 @@ int main(int argc, char* argv[])
 		void* stacktrace = StackTraceProperty->GetValue(exc);
 		void* message = MessageProperty->GetValue(exc);
 
-		// extract char16_t from strings
+		// extract wchar_t from strings
 
 		int message_len = *((int*) (((char*) message)+sizeof(Type*))); // we don't need stacktrace len because it will never have a null char
 
-		char16_t* stacktrace_cstr = (char16_t*) (((char*) stacktrace)+sizeof(Type*)+sizeof(int));
-		char16_t* message_cstr = (char16_t*) (((char*) message)+sizeof(Type*)+sizeof(int));
+		wchar_t* stacktrace_cstr = (wchar_t*) (((char*) stacktrace)+sizeof(Type*)+sizeof(int));
+		wchar_t* message_cstr = (wchar_t*) (((char*) message)+sizeof(Type*)+sizeof(int));
 
-		std::u16string stacktrace_cppstr = stacktrace_cstr;
-		std::u16string message_cppstr(message_cstr, message_len);
-
-		std::wstring_convert<std::codecvt_utf8<char16_t>, char16_t> converter;
+		std::wstring_view stacktrace_cppstr = stacktrace_cstr;
+		std::wstring_view message_cppstr(message_cstr, message_len);
 
 		// does this work?
-		std::cout
+		std::wcout
 			<< "Exception of type "
 			<< SystemException->name
 			<< " thrown: "
-			<< converter.to_bytes(message_cppstr)
+			<< message_cppstr
 			<< " ---- Stacktrace: "
-			<< converter.to_bytes(stacktrace_cppstr);
+			<< stacktrace_cppstr
+			<< std::endl;
 		
 		retcode = 1;
 	}
