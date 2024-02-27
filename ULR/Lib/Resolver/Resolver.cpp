@@ -583,7 +583,32 @@ namespace ULR::Resolver
 						bt_str.append(assembly->name);
 						bt_str.append(") @ ");
 					}
-					else bt_str.append("in unmanaged function (Module unknown) @ "); // TODO: grab actual module name
+					else 
+					{
+						// grab dll name
+						char* name = new char[0];
+						size_t name_size = 10;
+						size_t actual_size = 0;
+
+						do
+						{
+							delete[] name;
+							name = new char[name_size];
+
+							actual_size = GetModuleFileNameA(instrmod, name, name_size-1);
+
+						} while (actual_size != name_size-1);
+
+						name[actual_size] = '\0';
+						
+						// end grab dll name
+
+						bt_str.append("in unmanaged function (");
+						bt_str.append(name);
+						bt_str.append(") @ ");
+
+						delete[] name;
+					}
 				}
 
 				bt_str.append(fmt_ptr.str());
