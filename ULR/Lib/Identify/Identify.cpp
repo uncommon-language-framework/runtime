@@ -1,0 +1,1 @@
+extern "C" char ulr_identify_nativelib;

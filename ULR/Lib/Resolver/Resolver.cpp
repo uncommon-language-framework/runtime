@@ -384,6 +384,21 @@ namespace ULR::Resolver
 		return result;
 	}
 
+	Assembly* ULRAPIImpl::ResolveAddressToAssembly(void* addr)
+	{
+		for (auto& entry : *assemblies)
+		{
+			if (entry.second->handle == addr) return entry.second;
+		}
+		
+		for (auto& entry : *read_assemblies)
+		{
+			if (entry.second->handle == addr) return entry.second;
+		}
+
+		return nullptr;
+	}
+
 	MemberInfo* ULRAPIImpl::ResolveAddressToMember(void* addr)
 	{
 		for (auto& entry : *assemblies)
@@ -541,30 +556,43 @@ namespace ULR::Resolver
 			void* funcaddr = (void*) info.Address;
 
 			MemberInfo* member = ResolveAddressToMember(funcaddr);
-		
+			
 			if (!member)
 			{
-				if (i < num_frames-1)
+				MEMORY_BASIC_INFORMATION mbi;
+
+				if (!VirtualQuery(bt[i], &mbi, sizeof(mbi))) break;
+
+				HMODULE instrmod = (HMODULE) mbi.AllocationBase;
+
+				std::stringstream fmt_ptr;
+
+				fmt_ptr << std::hex << bt[i];
+
+				if (GetProcAddress(instrmod, "ulr_identify_nativelib"))
 				{
-					// if next func is a ULR func
-
-					if (!SymGetSymFromAddr(proc, (DWORD64) bt[i+1], NULL, &info)) break;
-
-					MemberInfo* trymember = ResolveAddressToMember((void*) info.Address);
-
-					if (!trymember) break;
-
-					std::stringstream fmt_ptr;
-
-					fmt_ptr << std::hex << bt[i];
-
-					bt_str.append("in non-ULR-function (probably api->ConstructObject) @ ");
-					bt_str.append(fmt_ptr.str());
-					bt_str.append("...\n");
-
-					continue;
+					bt_str.append("in ULR API function (ULR NativeLib) @ ");
 				}
-			};
+				else
+				{
+					Assembly* assembly = ResolveAddressToAssembly(instrmod);
+
+					if (assembly)
+					{
+						bt_str.append("in assembly-local API function (");
+						bt_str.append(assembly->name);
+						bt_str.append(") @ ");
+					}
+					else bt_str.append("in unmanaged function (Module unknown) @ "); // TODO: grab actual module name
+				}
+
+				bt_str.append(fmt_ptr.str());
+				bt_str.append("...\n");
+
+				continue;
+			}
+
+			Assembly* assembly = member->parent_type->assembly;
 
 			std::stringstream fmt_ptr;
 
@@ -574,6 +602,9 @@ namespace ULR::Resolver
 			bt_str.append(
 				GetDisplayNameOf(member)
 			);
+			bt_str.append(" (");
+			bt_str.append(assembly->name);
+			bt_str.push_back(')');
 			bt_str.append(" @ ");
 			bt_str.append(fmt_ptr.str());
 			bt_str.append("...\n");
