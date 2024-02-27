@@ -569,7 +569,7 @@ namespace ULR::Resolver
 
 				fmt_ptr << std::hex << bt[i];
 
-				if (GetProcAddress(instrmod, "ulr_identify_nativelib"))
+				if (GetProcAddress(instrmod, "ulr_identify_nativelib") != nullptr)
 				{
 					bt_str.append("in ULR API function (ULR NativeLib) @ ");
 				}
@@ -587,27 +587,65 @@ namespace ULR::Resolver
 					{
 						// grab dll name
 						char* name = new char[0];
-						size_t name_size = 10;
+						size_t name_size = 20;
 						size_t actual_size = 0;
 
 						do
 						{
+							name_size+=5;
+
 							delete[] name;
 							name = new char[name_size];
 
 							actual_size = GetModuleFileNameA(instrmod, name, name_size-1);
-
-						} while (actual_size != name_size-1);
+						} while (actual_size > name_size-2);
 
 						name[actual_size] = '\0';
 						
 						// end grab dll name
 
-						bt_str.append("in unmanaged function (");
+						// grab func name
+						size_t base_funcinfo_size = sizeof(SYMBOL_INFO);
+						char* funcinfobuf = new char[0];
+						char* funcname;
+						name_size = 20;
+						actual_size = 0;
+
+						DWORD64 displacement;
+
+						do
+						{
+							name_size+=5;
+
+							delete[] funcinfobuf;
+							funcinfobuf = new char[base_funcinfo_size+name_size];
+
+							PSYMBOL_INFO info_ptr = (PSYMBOL_INFO) funcinfobuf;
+							info_ptr->SizeOfStruct = base_funcinfo_size;
+							info_ptr->MaxNameLen = name_size;
+
+							if (!SymFromAddr(proc, info.Address, &displacement, info_ptr))
+							{
+								funcname = "<unknown func>";
+								break;
+							}
+
+							funcname = info_ptr->Name;
+							actual_size = info_ptr->NameLen;
+						} while (actual_size > name_size-2);
+
+						funcname[actual_size] = '\0';
+						
+						// end grab func name
+
+						bt_str.append("in unmanaged function '");
+						bt_str.append(funcname);
+						bt_str.append("' (");
 						bt_str.append(name);
 						bt_str.append(") @ ");
 
 						delete[] name;
+						delete[] funcinfobuf;
 					}
 				}
 

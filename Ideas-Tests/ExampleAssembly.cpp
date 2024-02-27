@@ -19,6 +19,7 @@ extern "C"
 	void (*overload0_ns1_System_Exception_ctor)(char* self);
 	void (*overload1_ns1_System_Exception_ctor)(char* self, char* msg);
 	char* (*special_string_MAKE_FROM_LITERAL)(const wchar_t* str, int len);
+	void (*external_func)(void (*callback)());
 
 
 	void InitAssembly(ULRAPIImpl* ulr)
@@ -36,9 +37,16 @@ extern "C"
 		overload0_ns1_System_Exception_ctor = (void (*)(char*)) api->LocateSymbol(stdlib, "overload0_ns1_System_Exception_ctor");
 		overload1_ns1_System_Exception_ctor = (void (*)(char*, char*)) api->LocateSymbol(stdlib, "overload1_ns1_System_Exception_ctor");
 		special_string_MAKE_FROM_LITERAL = (char* (*)(const wchar_t*, int)) api->LocateSymbol(stdlib, "special_string_MAKE_FROM_LITERAL");
+		
+		HMODULE external_lib = LoadLibraryA("ExternalLib.dll");
+		external_func = (void (*)(void (*)())) GetProcAddress(external_lib, "external_func");
 	}
 
 	void ns0_Program_ctor(char* self /* rest of args... */)
+	{
+	}
+
+	void unknown_throw_exc()
 	{
 		char* exc = api->ConstructObject(
 			overload1_ns1_System_Exception_ctor,
@@ -67,6 +75,8 @@ extern "C"
 
 		Type* typeofobj = api->GetTypeOf(obj);
 		std::cout << "Type of obj: " << typeofobj->name << " (" << typeofobj->assembly->name << ')' << std::endl;
+
+		external_func(unknown_throw_exc);
 
 		ulrlocals[0] = nullptr;
 
