@@ -40,6 +40,24 @@ Assembly* ArrayTypeAssembly;
 char* (*special_string_MAKE_FROM_LITERAL)(wchar_t* str, int len);
 char* (*special_array_from_ptr)(void* ptr, int size, Type* type);
 
+char* generate_ulr_argv(int argc, char* argv[])
+{
+	char** ulr_args = new char*[argc-1]; // argc-1 to skip ulrhost.exe arg
+
+		for (int i = 0; i < argc-1; i++) // argc-1 to skip ulrhost.exe arg
+		{
+			size_t len = strlen(argv[i+1]);
+
+			wchar_t as_wchar[len];
+
+			std::copy(argv[i+1], &argv[i+1][len], as_wchar);
+
+			ulr_args[i] = special_string_MAKE_FROM_LITERAL(as_wchar, len);
+		}
+
+	return special_array_from_ptr(ulr_args, argc-1, StringArrayType);
+}
+
 int main(int argc, char* argv[])
 {	
 	ULRAPIImpl lclapi = ULRAPIImpl( // perhaps refactor Loader into an object someday
@@ -85,22 +103,7 @@ int main(int argc, char* argv[])
 
 	ArrayTypeAssembly->types.emplace(StringArrayType->name, StringArrayType);
 
-	char** ulr_args = new char*[argc-1]; // argc-1 to skip ulrhost.exe arg
-
-	for (int i = 0; i < argc-1; i++) // argc-1 to skip ulrhost.exe arg
-	{
-		size_t len = strlen(argv[i+1]);
-
-		wchar_t as_wchar[len];
-
-		std::copy(argv[i+1], &argv[i+1][len], as_wchar);
-
-		ulr_args[i] = special_string_MAKE_FROM_LITERAL(as_wchar, len);
-
-		std::cout << (void*) ulr_args[i] << std::endl;
-	}
-
-	char* ulr_args_arr_obj = special_array_from_ptr(ulr_args, argc-1, StringArrayType);
+	char* ulr_args_arr_obj = generate_ulr_argv(argc, argv);
 
 	int retcode;
 	
@@ -127,12 +130,13 @@ int main(int argc, char* argv[])
 		std::wstring_view message_cppstr(message_cstr, message_len);
 
 		// does this work?
+		std::cout
+			<< "Unhandled Exception "
+			<< lclapi.GetDisplayNameOf(SystemException)
+			<< ": ";
+
 		std::wcout
-			<< "Exception of type "
-			<< SystemException->name
-			<< " thrown: "
 			<< message_cppstr
-			<< " ---- Stacktrace: "
 			<< stacktrace_cppstr
 			<< std::endl;
 		

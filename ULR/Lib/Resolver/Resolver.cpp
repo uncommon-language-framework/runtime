@@ -2,6 +2,14 @@
 #include <dbghelp.h>
 #include <sstream>
 
+#define COLOR_INTEGER "\u001b[1m" // bold actually
+#define COLOR_TYPE_GREEN "\u001b[92m"
+#define COLOR_YELLOW "\u001b[33m"
+#define COLOR_MAGENTA "\u001b[35m"
+#define COLOR_FIELD_BLUE "\u001b[36m"
+
+#define COLOR_END "\u001b[0m"
+
 namespace ULR::Resolver
 {
 	ULRAPIImpl::ULRAPIImpl(
@@ -456,12 +464,28 @@ namespace ULR::Resolver
 		{
 			dispname.erase(0, 2);
 
+			dispname.insert(0, COLOR_TYPE_GREEN);
+			dispname.append(COLOR_END);
+
 			return dispname;
 		}
 
 		dispname.erase(0, 1);
-		
+
+		dispname.insert(0, COLOR_TYPE_GREEN);
+
 		dispname.replace(dispname.find(']'), 1, ".");
+
+		size_t lastpos = 0;
+
+		while ((lastpos = dispname.find('.', lastpos)) != std::string::npos)
+		{
+			dispname.replace(lastpos, 1, COLOR_END "." COLOR_TYPE_GREEN);
+
+			lastpos+=sizeof(COLOR_END)+sizeof(".")+sizeof(COLOR_TYPE_GREEN);
+		}
+		
+		dispname.append(COLOR_END);
 
 		return dispname;
 	}
@@ -472,6 +496,9 @@ namespace ULR::Resolver
 
 		if (member->decl_type == MemberType::Field)
 		{
+			base_display.replace(base_display.find_last_of('.'), 1, "." COLOR_FIELD_BLUE);
+			base_display.append(COLOR_END);
+
 			base_display.insert(base_display.begin(), ' ');
 			base_display.insert(0, GetDisplayNameOf(((FieldInfo*) member)->valtype));
 			
@@ -480,6 +507,9 @@ namespace ULR::Resolver
 
 		if (member->decl_type == MemberType::Property)
 		{
+			base_display.replace(base_display.find_last_of('.'), 1, "." COLOR_FIELD_BLUE);
+			base_display.append(COLOR_END);
+
 			base_display.insert(base_display.begin(), ' ');
 			base_display.insert(0, GetDisplayNameOf(((PropertyInfo*) member)->valtype));
 			
@@ -488,6 +518,9 @@ namespace ULR::Resolver
 
 		if (member->decl_type == MemberType::Dtor)
 		{
+			base_display.insert(0, COLOR_YELLOW);
+			base_display.append(COLOR_END);
+
 			base_display.append("()");
 
 			return base_display;
@@ -495,6 +528,9 @@ namespace ULR::Resolver
 
 		if (member->decl_type == MemberType::Ctor)
 		{
+			base_display.insert(0, COLOR_YELLOW);
+			base_display.append(COLOR_END);
+
 			base_display.push_back('(');
 
 			for (auto& arg : ((ConstructorInfo*) member)->signature)
@@ -512,6 +548,9 @@ namespace ULR::Resolver
 
 		if (member->decl_type == MemberType::Method)
 		{
+			base_display.replace(base_display.find_last_of('.'), 1, "." COLOR_YELLOW);
+			base_display.append(COLOR_END);
+
 			base_display.insert(base_display.begin(), ' ');
 			base_display.insert(0, GetDisplayNameOf(((MethodInfo*) member)->rettype));
 
@@ -535,7 +574,7 @@ namespace ULR::Resolver
 	
 	std::string ULRAPIImpl::GetStackTrace(int skipframes)
 	{
-		std::string bt_str("\nmost recent frame >\n");
+		std::string bt_str("\n\t");
 
 		bt_str.reserve(MAX_TRACEBACK*20);
 
@@ -567,7 +606,7 @@ namespace ULR::Resolver
 
 				std::stringstream fmt_ptr;
 
-				fmt_ptr << std::hex << bt[i];
+				fmt_ptr << COLOR_INTEGER << std::hex << bt[i] << COLOR_END;
 
 				if (GetProcAddress(instrmod, "ulr_identify_nativelib") != nullptr)
 				{
@@ -580,7 +619,9 @@ namespace ULR::Resolver
 					if (assembly)
 					{
 						bt_str.append("in assembly-local API function (");
+						bt_str.append(COLOR_MAGENTA);
 						bt_str.append(assembly->name);
+						bt_str.append(COLOR_END);
 						bt_str.append(") @ ");
 					}
 					else 
@@ -641,7 +682,9 @@ namespace ULR::Resolver
 						bt_str.append("in unmanaged function '");
 						bt_str.append(funcname);
 						bt_str.append("' (");
+						bt_str.append(COLOR_MAGENTA);
 						bt_str.append(name);
+						bt_str.append(COLOR_END);
 						bt_str.append(") @ ");
 
 						delete[] name;
@@ -650,7 +693,7 @@ namespace ULR::Resolver
 				}
 
 				bt_str.append(fmt_ptr.str());
-				bt_str.append("...\n");
+				bt_str.append("...\n\t");
 
 				continue;
 			}
@@ -659,18 +702,20 @@ namespace ULR::Resolver
 
 			std::stringstream fmt_ptr;
 
-			fmt_ptr << std::hex << bt[i];
+			fmt_ptr << COLOR_INTEGER << std::hex << bt[i] << COLOR_END;
 
 			bt_str.append("in ");
 			bt_str.append(
 				GetDisplayNameOf(member)
 			);
 			bt_str.append(" (");
+			bt_str.append(COLOR_MAGENTA);
 			bt_str.append(assembly->name);
+			bt_str.append(COLOR_END);
 			bt_str.push_back(')');
 			bt_str.append(" @ ");
 			bt_str.append(fmt_ptr.str());
-			bt_str.append("...\n");
+			bt_str.append("...\n\t");
 		}
 		
 		bt_str.append(" ^ outermost frame\n");
