@@ -223,7 +223,7 @@ namespace ULR
 			char** locals;
 			size_t localslen;
 			size_t** localsmapping;
-			int (*entry)() = NULL;
+			int (*entry)(char*) = NULL;
 			std::map<char*, Type*, cmp_chr_ptr> types;
 			std::unordered_map<std::string_view, void*> cached_sym_lookups;
 

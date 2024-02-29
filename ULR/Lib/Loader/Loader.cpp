@@ -16,12 +16,18 @@ namespace ULR::Loader
 	{
 		HMODULE mod = LoadLibraryA(dll);
 
+		if (mod == nullptr)
+		{
+			std::cerr << "fatal: '" << dll << "' not found" << std::endl;
+			exit(1);
+		}
+
 		char* meta = (char*) GetProcAddress(mod, "ulrmeta");
 		void** addr = (void**) GetProcAddress(mod, "ulraddr");
 
 		if (meta == nullptr || addr == nullptr)
 		{
-			std::wcout << "fatal: lib "  << dll << " failed to load";
+			std::cerr << "fatal: '"  << dll << "' is not a valid ULR Assembly";
 			exit(1);
 		}
 
@@ -385,7 +391,7 @@ namespace ULR::Loader
 						if (is_generic) type->AddStaticMember(new MethodInfo(strdup(func_name.c_str()), true, argsig, GetType(const_cast<char*>(full_rettype.c_str())), 0, attrs, true, (char*) addr[nummember]));
 						else type->AddStaticMember(new MethodInfo(strdup(func_name.c_str()), true, argsig, GetType(const_cast<char*>(full_rettype.c_str())), addr[nummember], attrs, false));
 
-						assembly->entry = (int (*)()) addr[nummember];
+						assembly->entry = (int (*)(char*)) addr[nummember];
 						
 						continue;
 					}

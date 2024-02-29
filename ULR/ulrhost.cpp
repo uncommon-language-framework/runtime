@@ -33,6 +33,13 @@ std::wstring to_wstr(std::u16string str)
 	return wstr;
 }
 
+Type* StringArrayType;
+Assembly* ArrayTypeAssembly;
+
+
+char* (*special_string_MAKE_FROM_LITERAL)(wchar_t* str, int len);
+char* (*special_array_from_ptr)(void* ptr, int size, Type* type);
+
 int main(int argc, char* argv[])
 {	
 	ULRAPIImpl lclapi = ULRAPIImpl( // perhaps refactor Loader into an object someday
@@ -41,10 +48,12 @@ int main(int argc, char* argv[])
 		Loader::ReadAssembly,
 		Loader::LoadAssembly
 	);
-
 	/* Initialize Internal Library */
 
 	internal_api = &lclapi;
+
+	ArrayTypeAssembly = new Assembly(strdup("ULR.<ArrayTypes>"), "", 0, nullptr, nullptr, 0, nullptr, (HMODULE) nullptr);
+	Loader::LoadedAssemblies["ULR.<ArrayTypes>"] = ArrayTypeAssembly;
 
 	
 	/* Load Stdlib*/
@@ -52,7 +61,7 @@ int main(int argc, char* argv[])
 	char* stdlib_path = strdup("../../ulflib/src/native/System.Runtime.Native.dll");
 
 	Loader::ReadAssembly(stdlib_path);
-	Loader::LoadAssembly(stdlib_path, &lclapi);
+	Assembly* stdlibasm = Loader::LoadAssembly(stdlib_path, &lclapi);
 
 	/* Load Main Assembly */
 
@@ -67,9 +76,35 @@ int main(int argc, char* argv[])
 		throw std::runtime_error("No entry point found.");
 	}
 
+	/* Initialize string[] args / argv */
+
+	special_string_MAKE_FROM_LITERAL = (char* (*)(wchar_t*, int)) lclapi.LocateSymbol(stdlibasm, "special_string_MAKE_FROM_LITERAL");
+	special_array_from_ptr = (char* (*)(void*, int, Type*)) lclapi.LocateSymbol(stdlibasm, "special_array_from_ptr");
+	
+	StringArrayType = new Type(TypeType::ArrayType, ArrayTypeAssembly, strdup("[System]String[]"), Modifiers::Public | Modifiers::Sealed, 0, { }, lclapi.GetType("[System]Object"), false, 0);
+
+	ArrayTypeAssembly->types.emplace(StringArrayType->name, StringArrayType);
+
+	char** ulr_args = new char*[argc-1]; // argc-1 to skip ulrhost.exe arg
+
+	for (int i = 0; i < argc-1; i++) // argc-1 to skip ulrhost.exe arg
+	{
+		size_t len = strlen(argv[i+1]);
+
+		wchar_t as_wchar[len];
+
+		std::copy(argv[i+1], &argv[i+1][len], as_wchar);
+
+		ulr_args[i] = special_string_MAKE_FROM_LITERAL(as_wchar, len);
+
+		std::cout << (void*) ulr_args[i] << std::endl;
+	}
+
+	char* ulr_args_arr_obj = special_array_from_ptr(ulr_args, argc-1, StringArrayType);
+
 	int retcode;
 	
-	try { retcode = mainasm->entry(); }
+	try { retcode = mainasm->entry(ulr_args_arr_obj); }
 	catch (char* exc)
 	{
 		Type* SystemException = lclapi.GetTypeOf(exc); // OR GetType("[System]Exception", "System.Runtime.Native.dll")
