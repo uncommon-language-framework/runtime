@@ -24,6 +24,6 @@ namespace ULR
 		for (auto &entry : types)
 		{
 			delete entry.second;
-		}
+		}	
 	}
 }

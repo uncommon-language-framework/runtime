@@ -157,12 +157,15 @@ namespace ULR::Loader
 	{
 		std::string as_str = dll;
 
+		// TODO: remove this unnecessary allocation (strdup)
 		char* shortname = strdup(as_str.substr(as_str.find_last_of("/\\") + 1).c_str());
 
 		if (LoadedAssemblies.count(shortname) == 1) return LoadedAssemblies[shortname];
 		if (ReadAssemblies.count(shortname) == 0) throw std::runtime_error(std::string("Attempted to load assembly '")+dll+std::string("' without reading it first"));
 
 		Assembly* assembly = ReadAssemblies[shortname];
+
+		free(shortname); // TODO: see note about strdup allocation above
 
 		char* meta = assembly->meta;
 		void** addr = assembly->addr;
@@ -669,7 +672,7 @@ namespace ULR::Loader
 			i++; // skip newline
 		}
 		
-		LoadedAssemblies[shortname] = assembly;
+		LoadedAssemblies[assembly->name] = assembly;
 
 		void (*init_asm)(Resolver::ULRAPIImpl*) = (void (*)(Resolver::ULRAPIImpl*)) GetProcAddress(assembly->handle, "InitAssembly");
 
@@ -739,7 +742,7 @@ namespace ULR::Loader
 
 			Type* array_type = new Type(TypeType::ArrayType, ArrayTypeAssembly, strdup(qual_name), Modifiers::Public | Modifiers::Sealed, 0, { }, GetType("[System]Object"), elem_type);
 
-			ArrayTypeAssembly->types[qual_name] = array_type;
+			ArrayTypeAssembly->types[array_type->name] = array_type; // use array_type->name because it is guaranteed to be dynamically allocated and last as long as array_type lasts
 
 			return array_type;
 		}

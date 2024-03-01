@@ -19,20 +19,6 @@ using precise_clock = std::chrono::steady_clock;
 
 #define get_duration_ms(duration) std::chrono::duration_cast<std::chrono::nanoseconds>(duration)
 
-std::wstring to_wstr(std::u16string str)
-{
-	std::wstring wstr;
-
-	wstr.reserve(str.size());
-
-	for (wchar_t c : str)
-	{
-		wstr.push_back((wchar_t) c);
-	}
-
-	return wstr;
-}
-
 char* (*special_string_MAKE_FROM_LITERAL)(wchar_t* str, int len);
 char* (*special_array_from_ptr)(void* ptr, int size, Type* type);
 
@@ -40,20 +26,24 @@ char* generate_ulr_argv(int argc, char* argv[])
 {
 	char** ulr_args = new char*[argc-1]; // argc-1 to skip ulrhost.exe arg
 
-		for (int i = 0; i < argc-1; i++) // argc-1 to skip ulrhost.exe arg
-		{
-			size_t len = strlen(argv[i+1]);
+	for (int i = 0; i < argc-1; i++) // argc-1 to skip ulrhost.exe arg
+	{
+		size_t len = strlen(argv[i+1]);
 
-			wchar_t as_wchar[len];
+		wchar_t as_wchar[len];
 
-			std::copy(argv[i+1], &argv[i+1][len], as_wchar);
+		std::copy(argv[i+1], &argv[i+1][len], as_wchar);
 
-			ulr_args[i] = special_string_MAKE_FROM_LITERAL(as_wchar, len);
-		}
+		ulr_args[i] = special_string_MAKE_FROM_LITERAL(as_wchar, len);
+	}
 
 	Type* StringArrayType = Loader::LoadedAssemblies["ULR.<ArrayTypes>"]->types["[System]String[]"];
 
-	return special_array_from_ptr(ulr_args, argc-1, StringArrayType);
+	char* arr = special_array_from_ptr(ulr_args, argc-1, StringArrayType);
+
+	delete[] ulr_args;
+
+	return arr;
 }
 
 int main(int argc, char* argv[])
@@ -70,7 +60,6 @@ int main(int argc, char* argv[])
 
 	Assembly* ArrayTypeAssembly = new Assembly(strdup("ULR.<ArrayTypes>"), "", 0, nullptr, nullptr, 0, nullptr, (HMODULE) nullptr);
 	Loader::LoadedAssemblies["ULR.<ArrayTypes>"] = ArrayTypeAssembly;
-
 	
 	/* Load Stdlib*/
 	
@@ -97,10 +86,10 @@ int main(int argc, char* argv[])
 	special_string_MAKE_FROM_LITERAL = (char* (*)(wchar_t*, int)) lclapi.LocateSymbol(stdlibasm, "special_string_MAKE_FROM_LITERAL");
 	special_array_from_ptr = (char* (*)(void*, int, Type*)) lclapi.LocateSymbol(stdlibasm, "special_array_from_ptr");
 	
-	if (ArrayTypeAssembly->types.count("[System]String[]") == 0) //  if System.String[] (string[]) not already loaded
+	if (ArrayTypeAssembly->types["[System]String[]"] == nullptr) //  if System.String[] (string[]) not already loaded (or is a nullptr for some reason)
 	{
 		Type* StringArrayType = new Type(TypeType::ArrayType, ArrayTypeAssembly, strdup("[System]String[]"), Modifiers::Public | Modifiers::Sealed, 0, { }, lclapi.GetType("[System]Object"), lclapi.GetType("[System]String"));
-		ArrayTypeAssembly->types[StringArrayType->name] =  StringArrayType;
+		ArrayTypeAssembly->types["[System]String[]"] =  StringArrayType;
 	}
 
 	char* ulr_args_arr_obj = generate_ulr_argv(argc, argv);
@@ -166,6 +155,9 @@ int main(int argc, char* argv[])
 	{
 		delete placeholder;
 	}
+
+	free(assembly_name);
+	free(stdlib_path);
 
 	SymCleanup(GetCurrentProcess());
 

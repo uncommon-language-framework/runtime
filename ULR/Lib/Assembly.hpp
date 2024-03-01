@@ -9,6 +9,7 @@
 #include <cstring>
 #include <functional>
 #include <unordered_map>
+#include <iostream>
 
 #pragma once
 
@@ -56,7 +57,7 @@ namespace ULR
 	struct cmp_chr_ptr
 	{
 		bool operator()(char const *a, char const *b) const
-		{
+		{			
 			return strcmp(a, b) < 0;
 		}
 	};
@@ -219,7 +220,7 @@ namespace ULR
 			char** locals;
 			size_t localslen;
 			size_t** localsmapping;
-			int (*entry)(char*) = NULL;
+			int (*entry)(char*) = nullptr; // even if Main() doesn't take args, the register will be ignored by Main() so it doesn't matter if we pass it and it doesn't accept string[] argv
 			std::map<char*, Type*, cmp_chr_ptr> types;
 			std::unordered_map<std::string_view, void*> cached_sym_lookups;
 

@@ -456,7 +456,7 @@ namespace ULR::Resolver
 	}
 
 	std::string ULRAPIImpl::GetDisplayNameOf(Type* type)
-	{
+	{		
 		if (type->decl_type == TypeType::ArrayType)
 		{
 			std::string base = GetDisplayNameOf(type->element_type);
