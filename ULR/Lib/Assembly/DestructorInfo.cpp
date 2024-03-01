@@ -12,4 +12,16 @@ namespace ULR
 		this->is_empty_generic = is_generic;
 		this->generic_llir = generic_llir;
 	}
+
+	void DestructorInfo::Invoke(void* obj)
+	{
+		if (IsBoxableStruct(parent_type))
+		{
+			obj = ((Type**) obj) + 1; // give an illusion of an unboxed 'this' ptr by skipping the type ptr
+		}
+
+		void (*func)(void* self) = (void (*)(void*)) offset;
+
+		func(obj);
+	}
 }

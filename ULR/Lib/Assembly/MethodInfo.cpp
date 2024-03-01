@@ -34,8 +34,10 @@ namespace ULR
 		
 		if (!is_static)
 		{
-			args.emplace(args.begin(), self);
 			lclsig.emplace(lclsig.begin(), parent_type);
+
+			if (IsBoxableStruct(parent_type)) args.emplace(args.begin(), self+sizeof(Type)); // give an illusion of an unboxed 'this' ptr by skipping the type ptr
+			else args.emplace(args.begin(), self);
 		}
 
 		size_t numargs = args.size();

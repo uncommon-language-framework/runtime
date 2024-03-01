@@ -144,9 +144,6 @@ namespace ULR
 	class MethodInfo : public MemberInfo
 	{
 		public:
-			/* `signature` where
-					<argtype> <argtype> <rettype>
-					(rettype is the last type element) */
 			std::vector<Type*> argsig;
 			Type* rettype;
 			void* offset;
@@ -161,10 +158,7 @@ namespace ULR
 	class ConstructorInfo : public MemberInfo
 	{
 		public:
-			/* `signature` where
-					<argtype> <argtype>...
-					(no rettype) */
-			std::vector<Type*> signature;
+			std::vector<Type*> signature; // argsig since ctors have no rettype
 			void* offset;
 			bool is_static = true;
 			char* generic_llir;
@@ -183,17 +177,7 @@ namespace ULR
 			
 			DestructorInfo(void* offset, int attrs, bool is_generic, char* generic_llir = nullptr);
 
-			void Invoke(void* obj) // TODO: move impl to ULR.NativeLib src files
-			{
-				if (IsBoxableStruct(parent_type))
-				{
-					obj = ((Type**) obj) + 1; // give an illusion of an unboxed 'this' ptr by skipping the type ptr
-				}
-
-				void (*func)(void* self) = (void (*)(void*)) offset;
-
-				func(obj);
-			}
+			void Invoke(void* obj);
 	};
 
 	class FieldInfo : public MemberInfo
