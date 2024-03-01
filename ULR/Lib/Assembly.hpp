@@ -57,7 +57,7 @@ namespace ULR
 	struct cmp_chr_ptr
 	{
 		bool operator()(char const *a, char const *b) const
-		{			
+		{
 			return strcmp(a, b) < 0;
 		}
 	};

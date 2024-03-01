@@ -59,7 +59,7 @@ int main(int argc, char* argv[])
 	internal_api = &lclapi;
 
 	Assembly* ArrayTypeAssembly = new Assembly(strdup("ULR.<ArrayTypes>"), "", 0, nullptr, nullptr, 0, nullptr, (HMODULE) nullptr);
-	Loader::LoadedAssemblies["ULR.<ArrayTypes>"] = ArrayTypeAssembly;
+	Loader::LoadedAssemblies[ArrayTypeAssembly->name] = ArrayTypeAssembly;
 	
 	/* Load Stdlib*/
 	
@@ -86,10 +86,10 @@ int main(int argc, char* argv[])
 	special_string_MAKE_FROM_LITERAL = (char* (*)(wchar_t*, int)) lclapi.LocateSymbol(stdlibasm, "special_string_MAKE_FROM_LITERAL");
 	special_array_from_ptr = (char* (*)(void*, int, Type*)) lclapi.LocateSymbol(stdlibasm, "special_array_from_ptr");
 	
-	if (ArrayTypeAssembly->types["[System]String[]"] == nullptr) //  if System.String[] (string[]) not already loaded (or is a nullptr for some reason)
+	if (ArrayTypeAssembly->types.count("[System]String[]") == 0) //  if System.String[] (string[]) not already loaded (or is a nullptr for some reason)
 	{
 		Type* StringArrayType = new Type(TypeType::ArrayType, ArrayTypeAssembly, strdup("[System]String[]"), Modifiers::Public | Modifiers::Sealed, 0, { }, lclapi.GetType("[System]Object"), lclapi.GetType("[System]String"));
-		ArrayTypeAssembly->types["[System]String[]"] =  StringArrayType;
+		ArrayTypeAssembly->types[StringArrayType->name] =  StringArrayType;
 	}
 
 	char* ulr_args_arr_obj = generate_ulr_argv(argc, argv);
