@@ -156,16 +156,14 @@ namespace ULR::Loader
 	Assembly* LoadAssembly(char* dll, Resolver::ULRAPIImpl* api)
 	{
 		std::string as_str = dll;
+		std::string shortname_str = as_str.substr(as_str.find_last_of("/\\") + 1);
 
-		// TODO: remove this unnecessary allocation (strdup)
-		char* shortname = strdup(as_str.substr(as_str.find_last_of("/\\") + 1).c_str());
+		char* shortname = const_cast<char*>(shortname_str.c_str());
 
 		if (LoadedAssemblies.count(shortname) == 1) return LoadedAssemblies[shortname];
 		if (ReadAssemblies.count(shortname) == 0) throw std::runtime_error(std::string("Attempted to load assembly '")+dll+std::string("' without reading it first"));
 
 		Assembly* assembly = ReadAssemblies[shortname];
-
-		free(shortname); // TODO: see note about strdup allocation above
 
 		char* meta = assembly->meta;
 		void** addr = assembly->addr;

@@ -63,14 +63,14 @@ int main(int argc, char* argv[])
 	
 	/* Load Stdlib*/
 	
-	char* stdlib_path = strdup("../../ulflib/src/native/System.Runtime.Native.dll");
+	char* stdlib_path = "../../ulflib/src/native/System.Runtime.Native.dll";
 
 	Loader::ReadAssembly(stdlib_path);
 	Assembly* stdlibasm = Loader::LoadAssembly(stdlib_path, &lclapi);
 
 	/* Load Main Assembly */
 
-	char* assembly_name = strdup(argv[1]);
+	char* assembly_name = argv[1];
 
 	Loader::ReadAssembly(assembly_name);
 
@@ -155,9 +155,6 @@ int main(int argc, char* argv[])
 	{
 		delete placeholder;
 	}
-
-	free(assembly_name);
-	free(stdlib_path);
 
 	SymCleanup(GetCurrentProcess());
 
