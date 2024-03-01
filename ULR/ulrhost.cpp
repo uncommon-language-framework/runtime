@@ -33,10 +33,6 @@ std::wstring to_wstr(std::u16string str)
 	return wstr;
 }
 
-Type* StringArrayType;
-Assembly* ArrayTypeAssembly;
-
-
 char* (*special_string_MAKE_FROM_LITERAL)(wchar_t* str, int len);
 char* (*special_array_from_ptr)(void* ptr, int size, Type* type);
 
@@ -55,6 +51,8 @@ char* generate_ulr_argv(int argc, char* argv[])
 			ulr_args[i] = special_string_MAKE_FROM_LITERAL(as_wchar, len);
 		}
 
+	Type* StringArrayType = Loader::LoadedAssemblies["ULR.<ArrayTypes>"]->types["[System]String[]"];
+
 	return special_array_from_ptr(ulr_args, argc-1, StringArrayType);
 }
 
@@ -70,7 +68,7 @@ int main(int argc, char* argv[])
 
 	internal_api = &lclapi;
 
-	ArrayTypeAssembly = new Assembly(strdup("ULR.<ArrayTypes>"), "", 0, nullptr, nullptr, 0, nullptr, (HMODULE) nullptr);
+	Assembly* ArrayTypeAssembly = new Assembly(strdup("ULR.<ArrayTypes>"), "", 0, nullptr, nullptr, 0, nullptr, (HMODULE) nullptr);
 	Loader::LoadedAssemblies["ULR.<ArrayTypes>"] = ArrayTypeAssembly;
 
 	
@@ -99,9 +97,11 @@ int main(int argc, char* argv[])
 	special_string_MAKE_FROM_LITERAL = (char* (*)(wchar_t*, int)) lclapi.LocateSymbol(stdlibasm, "special_string_MAKE_FROM_LITERAL");
 	special_array_from_ptr = (char* (*)(void*, int, Type*)) lclapi.LocateSymbol(stdlibasm, "special_array_from_ptr");
 	
-	StringArrayType = new Type(TypeType::ArrayType, ArrayTypeAssembly, strdup("[System]String[]"), Modifiers::Public | Modifiers::Sealed, 0, { }, lclapi.GetType("[System]Object"), false, 0);
-
-	ArrayTypeAssembly->types.emplace(StringArrayType->name, StringArrayType);
+	if (ArrayTypeAssembly->types.count("[System]String[]") == 0) //  if System.String[] (string[]) not already loaded
+	{
+		Type* StringArrayType = new Type(TypeType::ArrayType, ArrayTypeAssembly, strdup("[System]String[]"), Modifiers::Public | Modifiers::Sealed, 0, { }, lclapi.GetType("[System]Object"), lclapi.GetType("[System]String"));
+		ArrayTypeAssembly->types[StringArrayType->name] =  StringArrayType;
+	}
 
 	char* ulr_args_arr_obj = generate_ulr_argv(argc, argv);
 

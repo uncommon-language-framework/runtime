@@ -92,10 +92,12 @@ namespace ULR
 			std::vector<Type*> interfaces;
 			Type* immediate_base;
 
-			bool is_empty_generic;
-			bool is_generic_construction;
-			unsigned int num_type_args;
+			bool is_empty_generic = false;
+			bool is_generic_construction = false;
+			unsigned int num_type_args = 0;
 			std::vector<Type*> type_args;
+			
+			Type* element_type; // if the type is an array type
 
 			Type(
 				TypeType decl_type,
@@ -107,7 +109,17 @@ namespace ULR
 				Type* immediate_base,
 				bool is_empty_generic,
 				unsigned int num_type_args
-				);
+			);
+			Type(
+				TypeType decl_type,
+				Assembly* assembly,
+				char* name,
+				unsigned int attrs,
+				size_t size,
+				std::vector<Type*> interfaces,
+				Type* immediate_base,
+				Type* array_element_type
+			);
 			virtual ~Type();
 
 			void AddStaticMember(MemberInfo* member);

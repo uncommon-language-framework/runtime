@@ -32,6 +32,18 @@ namespace ULR
 		this->num_type_args = num_type_args;
 	}
 
+	Type::Type(TypeType decl_type, Assembly* assembly, char* name, unsigned int attrs, size_t size, std::vector<Type*> interfaces, Type* immediate_base, Type* array_element_type)
+	{
+		this->decl_type = decl_type;
+		this->assembly = assembly;
+		this->name = name;
+		this->attrs = attrs;
+		this->size = size;
+		this->interfaces = interfaces;
+		this->immediate_base = immediate_base;
+		this->element_type = array_element_type;
+	}
+
 	void Type::AddStaticMember(MemberInfo* member)
 	{
 		member->parent_type = this;

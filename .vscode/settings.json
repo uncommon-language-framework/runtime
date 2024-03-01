@@ -11,6 +11,7 @@
 		"ulr": "cpp",
 		"stdulr": "cpp",
 		"*.rts": "python",
+		"*.ctr": "csharp",
 		"xstring": "cpp",
 		"xtree": "cpp",
 		"memory": "cpp",
@@ -92,7 +93,8 @@
 		"shared_mutex": "cpp",
 		"thread": "cpp",
 		"future": "cpp",
-		"variant": "cpp"
+		"variant": "cpp",
+		"*.def": "cpp"
 	},
 	"C_Cpp.default.compilerPath": "D:\\mingw64\\bin\\g++.exe"
 }

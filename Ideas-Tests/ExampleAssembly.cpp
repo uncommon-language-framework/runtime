@@ -61,22 +61,14 @@ void unknown_throw_exc()
 	throw special_exception_prep_for_throw(exc);
 }
 
-int ns0_Program_Main(char* argv) // TODO: put [System]String[] args in metadata
+int ns0_Program_Main(char* argv)
 {
-	// void (*ns1_System_Console_WriteLine)(void*) = (void (*)(void*)) ULRImpl->GetMethod("System", "Console", "WriteLine", "void;[System]String", MethodFlags::PUBLIC | MethodFlags::STATIC);
-	// void* (*ns1_System_String_ctor)(void*) = (void* (*)(void*)) ULRImpl->GetMethod("System", "String", ".ctor", "[$native]char[]", MethodFlags::CTOR);
-	// ns1_System_Int32_sizeof (*ns1_System_Int32_ctor)(int) = (ns1_System_Int32_sizeof (*)(int)) ULRImpl->GetMethod("System", "Int32", ".ctor", "[$native]int", MethodFlags::CTOR);
-
-	// ns1_System_Console_WriteLine(ns1_System_String_ctor((void*) "Hello, World!"));
-
-	// return ns1_System_Int32_ctor(0);
-
 	char* first_arg = special_array_ref_overload_operator_idx_ns1_System(argv, 0);
 
 	int first_arg_len = *reinterpret_cast<int*>(first_arg+sizeof(Type*));
 	wchar_t* first_arg_ptr = (wchar_t*) (first_arg+sizeof(Type*)+sizeof(int));
 
-	std::wcout << "First element of string[] argv: " << std::wstring_view(first_arg_ptr, first_arg_len) << std::endl;
+	std::wcout << "First element of " << api->GetTypeOf(argv)->name << " argv: " << std::wstring_view(first_arg_ptr, first_arg_len) << std::endl;
 
 	char* obj = api->ConstructObject(ns0_Program_ctor, CachedProgramType);
 	ulrlocals[0] = obj;
@@ -99,7 +91,7 @@ int ns0_Program_Main(char* argv) // TODO: put [System]String[] args in metadata
 // [] -> no namespace
 // Program -> classname
 // $4 -> takes four bytes (4 byte pointer to actual type)
-char ulrmeta[] = "pc[]Program:[System]Object,$8;.ctor p();.entr s[System]Int32 Main();\n"
+char ulrmeta[] = "pc[]Program:[System]Object,$8;.ctor p();.entr s[System]Int32 Main([System]String[]);\n"
 ""
 "";
 

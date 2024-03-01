@@ -7,7 +7,6 @@
 #define COLOR_YELLOW "\u001b[33m"
 #define COLOR_MAGENTA "\u001b[35m"
 #define COLOR_FIELD_BLUE "\u001b[36m"
-
 #define COLOR_END "\u001b[0m"
 
 namespace ULR::Resolver
@@ -458,9 +457,18 @@ namespace ULR::Resolver
 
 	std::string ULRAPIImpl::GetDisplayNameOf(Type* type)
 	{
+		if (type->decl_type == TypeType::ArrayType)
+		{
+			std::string base = GetDisplayNameOf(type->element_type);
+
+			base.append("[]");
+
+			return base;
+		}
+		
 		std::string dispname = type->name;
 
-		if (dispname.find("[]") != std::string::npos)
+		if (dispname.find("[]") == 0)
 		{
 			dispname.erase(0, 2);
 
@@ -484,7 +492,7 @@ namespace ULR::Resolver
 
 			lastpos+=sizeof(COLOR_END)+sizeof(".")+sizeof(COLOR_TYPE_GREEN);
 		}
-		
+
 		dispname.append(COLOR_END);
 
 		return dispname;

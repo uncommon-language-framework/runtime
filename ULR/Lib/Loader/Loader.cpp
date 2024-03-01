@@ -727,6 +727,23 @@ namespace ULR::Loader
 			if (assembly->types.count(qual_name) == 1) return assembly->types[qual_name];
 		}
 
+
+		// if array type that is not already found, create it
+		size_t len = strlen(qual_name);
+
+		if (qual_name[len-2] == '[' && qual_name[len-1] == ']') // array type (ends with [])
+		{			
+			Assembly* ArrayTypeAssembly = LoadedAssemblies["ULR.<ArrayTypes>"];
+			
+			Type* elem_type = GetType(const_cast<char*>(std::string(qual_name, len-2).c_str())); // get inner element type (if it is a nested array, recursion will provide us the proper type)
+
+			Type* array_type = new Type(TypeType::ArrayType, ArrayTypeAssembly, strdup(qual_name), Modifiers::Public | Modifiers::Sealed, 0, { }, GetType("[System]Object"), elem_type);
+
+			ArrayTypeAssembly->types[qual_name] = array_type;
+
+			return array_type;
+		}
+
 		throw std::runtime_error("Type not found");
 	}
 }
