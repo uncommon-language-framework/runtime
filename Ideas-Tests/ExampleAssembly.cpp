@@ -78,6 +78,10 @@ int ns0_Program_Main(char* argv)
 	Type* typeofobj = api->GetTypeOf(obj);
 	std::cout << "Type of obj: " << typeofobj->name << " (" << typeofobj->assembly->name << ')' << std::endl;
 
+	// char* ptr = (char*) 234;
+
+	// *ptr = 'f';
+
 	special_array_ref_overload_operator_idx_ns1_System(argv, 10); // this should throw an exception
 
 	external_func(unknown_throw_exc);

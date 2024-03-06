@@ -8,6 +8,7 @@
 #include <codecvt>
 #include <locale>
 #include <string>
+#include <csignal>
 #include <Windows.h>
 #include <dbghelp.h>
 
@@ -46,8 +47,17 @@ char* generate_ulr_argv(int argc, char* argv[])
 	return arr;
 }
 
+void handle_access_violation(int signo)
+{
+	std::cerr
+		<< "Signal SIGSEGV recieved: Segmentation Fault. May be due to a null dereference or invalid pointer dereference. Stacktrace:"
+		<< internal_api->GetStackTrace(2);
+}
+
 int main(int argc, char* argv[])
 {	
+	std::signal(SIGSEGV, handle_access_violation);
+
 	ULRAPIImpl lclapi = ULRAPIImpl( // perhaps refactor Loader into an object someday
 		&Loader::LoadedAssemblies,
 		&Loader::ReadAssemblies,
@@ -119,12 +129,12 @@ int main(int argc, char* argv[])
 		std::wstring_view message_cppstr(message_cstr, message_len);
 
 		// does this work?
-		std::cout
+		std::cerr
 			<< "Unhandled Exception "
 			<< lclapi.GetDisplayNameOf(SystemException)
 			<< ": ";
 
-		std::wcout
+		std::wcerr
 			<< message_cppstr
 			<< stacktrace_cppstr
 			<< std::endl;
