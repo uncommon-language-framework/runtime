@@ -94,7 +94,8 @@
 		"thread": "cpp",
 		"future": "cpp",
 		"variant": "cpp",
-		"*.def": "cpp"
+		"*.def": "cpp",
+		"csignal": "cpp"
 	},
 	"C_Cpp.default.compilerPath": "D:\\mingw64\\bin\\g++.exe"
 }

@@ -42,6 +42,7 @@ namespace ULR::Loader
 			metalen,
 			addr,
 			(char**) GetProcAddress(mod, "ulrlocals"),
+			(Type**) GetProcAddress(mod, "ulrlocals_valtypeinfo"),
 			(size_t) GetProcAddress(mod, "ulrlocalslen"),
 			(size_t**) GetProcAddress(mod, "ulrlocalsmapping"),
 			mod

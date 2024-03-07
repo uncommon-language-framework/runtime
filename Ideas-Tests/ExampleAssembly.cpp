@@ -7,12 +7,11 @@ Type* CachedProgramType;
 Type* CachedExceptionType;
 
 BEGIN_ULR_EXPORT
-const size_t ulrlocalslen = 1; // we don't use any managed locals rn, change later once used
-const void* ulrlocals[ulrlocalslen]; // if lcls are used, then change to ulrlocals[ulrlocalslen];
-const size_t ulrlocalsmapping[][2] = {
-	{0, 0},
-	{0, 1}
-};
+const size_t ulrlocalslen = 1; 
+const char* ulrlocals[ulrlocalslen];
+const Type* ulrlocals_valtypeinfo[ulrlocalslen] = {
+	nullptr
+}; // until we find a more efficient way to do this, we need to load at least all value types
 
 char* (*special_exception_prep_for_throw)(char* self);
 void (*overload0_ns1_System_Exception_ctor)(char* self);
@@ -95,11 +94,11 @@ int ns0_Program_Main(char* argv)
 // [] -> no namespace
 // Program -> classname
 // $4 -> takes four bytes (4 byte pointer to actual type)
-char ulrmeta[] = "pc[]Program:[System]Object,$8;.ctor p();.entr s[System]Int32 Main([System]String[]);\n"
+const char ulrmeta[] = "pc[]Program:[System]Object,$8;.ctor p();.entr s[System]Int32 Main([System]String[]);\n"
 ""
 "";
 
-void* ulraddr[] = {
+const void* ulraddr[] = {
 	(void*) ns0_Program_ctor,
 	(void*) ns0_Program_Main
 };

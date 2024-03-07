@@ -218,13 +218,14 @@ namespace ULR
 			size_t metalen;
 			void** addr;
 			char** locals;
+			Type** ulrlocals_valtypeinfo;
 			size_t localslen;
 			size_t** localsmapping;
 			int (*entry)(char*) = nullptr; // even if Main() doesn't take args, the register will be ignored by Main() so it doesn't matter if we pass it and it doesn't accept string[] argv
 			std::map<char*, Type*, cmp_chr_ptr> types;
 			std::unordered_map<std::string_view, void*> cached_sym_lookups;
 
-			Assembly(char* name, char* meta, size_t metalen, void** addr, char** locals, size_t localslen, size_t** localsmapping, HMODULE handle);
+			Assembly(char* name, char* meta, size_t metalen, void** addr, char** locals, Type** ulrlocals_valtypeinfo, size_t localslen, size_t** localsmapping, HMODULE handle);
 			~Assembly();
 	};
 }

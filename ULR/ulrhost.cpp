@@ -15,12 +15,13 @@
 using namespace ULR;
 using namespace ULR::Resolver;
 
+
 using std::chrono::duration;
 using precise_clock = std::chrono::steady_clock;
 
 #define get_duration_ms(duration) std::chrono::duration_cast<std::chrono::nanoseconds>(duration)
 
-char* (*special_string_MAKE_FROM_LITERAL)(wchar_t* str, int len);
+char* (*special_string_MAKE_FROM_LITERAL)(char* str, int len);
 char* (*special_array_from_ptr)(void* ptr, int size, Type* type);
 
 char* generate_ulr_argv(int argc, char* argv[])
@@ -29,13 +30,7 @@ char* generate_ulr_argv(int argc, char* argv[])
 
 	for (int i = 0; i < argc-1; i++) // argc-1 to skip ulrhost.exe arg
 	{
-		size_t len = strlen(argv[i+1]);
-
-		wchar_t as_wchar[len];
-
-		std::copy(argv[i+1], &argv[i+1][len], as_wchar);
-
-		ulr_args[i] = special_string_MAKE_FROM_LITERAL(as_wchar, len);
+		ulr_args[i] = special_string_MAKE_FROM_LITERAL(argv[i+1], strlen(argv[i+1]));
 	}
 
 	Type* StringArrayType = Loader::LoadedAssemblies["ULR.<ArrayTypes>"]->types["[System]String[]"];
@@ -55,7 +50,7 @@ void handle_access_violation(int signo)
 }
 
 int main(int argc, char* argv[])
-{	
+{
 	std::signal(SIGSEGV, handle_access_violation);
 
 	ULRAPIImpl lclapi = ULRAPIImpl( // perhaps refactor Loader into an object someday
@@ -68,7 +63,7 @@ int main(int argc, char* argv[])
 
 	internal_api = &lclapi;
 
-	Assembly* ArrayTypeAssembly = new Assembly(strdup("ULR.<ArrayTypes>"), "", 0, nullptr, nullptr, 0, nullptr, (HMODULE) nullptr);
+	Assembly* ArrayTypeAssembly = new Assembly(strdup("ULR.<ArrayTypes>"), "", 0, nullptr, nullptr, nullptr, 0, nullptr, (HMODULE) nullptr);
 	Loader::LoadedAssemblies[ArrayTypeAssembly->name] = ArrayTypeAssembly;
 	
 	/* Load Stdlib*/
@@ -93,7 +88,7 @@ int main(int argc, char* argv[])
 
 	/* Initialize string[] args / argv */
 
-	special_string_MAKE_FROM_LITERAL = (char* (*)(wchar_t*, int)) lclapi.LocateSymbol(stdlibasm, "special_string_MAKE_FROM_LITERAL");
+	special_string_MAKE_FROM_LITERAL = (char* (*)(char*, int)) lclapi.LocateSymbol(stdlibasm, "special_string_MAKE_FROM_LITERAL");
 	special_array_from_ptr = (char* (*)(void*, int, Type*)) lclapi.LocateSymbol(stdlibasm, "special_array_from_ptr");
 	
 	if (ArrayTypeAssembly->types.count("[System]String[]") == 0) //  if System.String[] (string[]) not already loaded (or is a nullptr for some reason)
@@ -118,25 +113,21 @@ int main(int argc, char* argv[])
 		void* stacktrace = StackTraceProperty->GetValue(exc);
 		void* message = MessageProperty->GetValue(exc);
 
-		// extract wchar_t from strings
+		// extract char from strings
 
-		int message_len = *((int*) (((char*) message)+sizeof(Type*))); // we don't need stacktrace len because it will never have a null char
+		int stacktrace_len = *((int*) (((char*) stacktrace)+sizeof(Type*)));
+		int message_len = *((int*) (((char*) message)+sizeof(Type*)));
 
-		wchar_t* stacktrace_cstr = (wchar_t*) (((char*) stacktrace)+sizeof(Type*)+sizeof(int));
-		wchar_t* message_cstr = (wchar_t*) (((char*) message)+sizeof(Type*)+sizeof(int));
-
-		std::wstring_view stacktrace_cppstr = stacktrace_cstr;
-		std::wstring_view message_cppstr(message_cstr, message_len);
+		char* stacktrace_cstr = (char*) (((char*) stacktrace)+sizeof(Type*)+sizeof(int));
+		char* message_cstr = (char*) (((char*) message)+sizeof(Type*)+sizeof(int));
 
 		// does this work?
 		std::cerr
 			<< "Unhandled Exception "
 			<< lclapi.GetDisplayNameOf(SystemException)
-			<< ": ";
-
-		std::wcerr
-			<< message_cppstr
-			<< stacktrace_cppstr
+			<< ": "
+			<< message_cstr
+			<< stacktrace_cstr
 			<< std::endl;
 		
 		retcode = 1;
