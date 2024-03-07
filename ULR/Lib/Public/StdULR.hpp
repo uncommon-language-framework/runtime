@@ -23,7 +23,7 @@ using sizeof_ns1_System_Int32 = int32_t;
 using sizeof_ns1_System_UInt32 = uint32_t;
 using sizeof_ns1_System_Int64 = int64_t;
 using sizeof_ns1_System_UInt64 = uint64_t;
-using sizeof_ns1_System_Char = char16_t;
+using sizeof_ns1_System_Char = char;
 using sizeof_ns1_System_Boolean = bool;
 
 // End native type definition
