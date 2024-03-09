@@ -121,13 +121,16 @@ int main(int argc, char* argv[])
 		char* stacktrace_cstr = (char*) (((char*) stacktrace)+sizeof(Type*)+sizeof(int));
 		char* message_cstr = (char*) (((char*) message)+sizeof(Type*)+sizeof(int));
 
+		std::string_view stacktrace_cppstr(stacktrace_cstr, stacktrace_len);
+		std::string_view message_cppstr(message_cstr, message_len);
+
 		// does this work?
 		std::cerr
 			<< "Unhandled Exception "
 			<< lclapi.GetDisplayNameOf(SystemException)
 			<< ": "
-			<< message_cstr
-			<< stacktrace_cstr
+			<< message_cppstr
+			<< stacktrace_cppstr
 			<< std::endl;
 		
 		retcode = 1;

@@ -10,7 +10,7 @@
 
 using ULR::Type;
 using ULR::Assembly;
-using ULR::Resolver::ULRAPIImpl;
+using namespace ULR::Resolver;
 
 
 // Define native types according to ULR naming convention

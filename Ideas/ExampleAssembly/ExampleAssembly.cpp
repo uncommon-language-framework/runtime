@@ -94,11 +94,11 @@ int ns0_Program_Main(char* argv)
 // [] -> no namespace
 // Program -> classname
 // $4 -> takes four bytes (4 byte pointer to actual type)
-const char ulrmeta[] = "pc[]Program:[System]Object,$8;.ctor p();.entr s[System]Int32 Main([System]String[]);\n"
+char ulrmeta[] = "pc[]Program:[System]Object,$8;.ctor p();.entr s[System]Int32 Main([System]String[]);\n"
 ""
 "";
 
-const void* ulraddr[] = {
+void* ulraddr[] = {
 	(void*) ns0_Program_ctor,
 	(void*) ns0_Program_Main
 };
