@@ -82,6 +82,8 @@ namespace ULR::Resolver
 			matches.emplace_back(to_add);
 		}
 
+		if ((matches.size() == 0) && type->immediate_base) return GetMember(type->immediate_base, name);
+
 		return matches;
 	}
 
@@ -141,7 +143,9 @@ namespace ULR::Resolver
 			}
 		}
 
-		throw /* new MethodNotFound exc */;
+		if (type->immediate_base) return GetMethod(type->immediate_base, name, argsignature, bindingflags);
+
+		return nullptr;
 	}
 
 	FieldInfo* ULRAPIImpl::GetField(Type* type, char name[], int bindingflags)
@@ -170,7 +174,9 @@ namespace ULR::Resolver
 			}
 		}
 
-		throw /* new FieldNotFound exc */;		
+		if (type->immediate_base) return GetField(type->immediate_base, name, bindingflags);
+
+		return nullptr;	
 	}
 
 	PropertyInfo* ULRAPIImpl::GetProperty(Type* type, char name[], int bindingflags)
@@ -199,7 +205,9 @@ namespace ULR::Resolver
 			}
 		}
 
-		throw /* new FieldNotFound exc */;		
+		if (type->immediate_base) return GetProperty(type->immediate_base, name, bindingflags);
+
+		return nullptr;	
 	}
 
 	DestructorInfo* ULRAPIImpl::GetDtor(Type* type)

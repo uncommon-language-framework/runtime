@@ -20,13 +20,16 @@ void overload0_ns0_Program_ctor(char* self) {}
 
 sizeof_ns1_System_Int32 overload0_ns0_Program_Main(char* argv)
 {
+	Type* program = internal_api->GetType("[]Program", "ReflectedInheritance.dll");
 	Type* derived = internal_api->GetType("[]Derived", "ReflectedInheritance.dll");
 
 	TEST(derived, 1);
+	TEST(program, 2);
 
 	MethodInfo* method = internal_api->GetMethod(derived, "Method", { }, BindingFlags::Public | BindingFlags::Instance);
 
-	TEST(method, 2);
+	TEST(method, 3);
+	TEST(method->parent_type == program, 4);
 
 	char* boxedret = method->Invoke(\
 		internal_api->ConstructObject(overload0_ns0_Derived_ctor, derived),
@@ -35,14 +38,14 @@ sizeof_ns1_System_Int32 overload0_ns0_Program_Main(char* argv)
 
 	sizeof_ns1_System_Int32 unboxed = internal_api->UnBox<sizeof_ns1_System_Int32>(boxedret);
 
-	TEST(unboxed == 27, 4);
+	TEST(unboxed == 27, 6);
 
 	return 0;
 }
 
 sizeof_ns1_System_Int32 overload0_ns0_Program_Method()
 {
-	TEST(true, 3);
+	TEST(true, 5);
 
 	return 27;
 }
