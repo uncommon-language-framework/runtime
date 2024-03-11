@@ -28,6 +28,15 @@ using sizeof_ns1_System_Boolean = bool;
 
 // End native type definition
 
+
+// Define a macro for boxing imitation without dynamic allocation
+
+#define ULR_USE_STACKBOX() char* _ulr_stackbox_tmp
+#define ULR_STACKBOX(obj, typeptr) ULR_STACKBOXED_VALUE = (char*) alloca(sizeof(typeptr)+sizeof(typeptr->size)); *((Type**) ULR_STACKBOXED_VALUE) = typeptr; memcpy(ULR_STACKBOXED_VALUE, &obj, typeptr->size)
+#define ULR_STACKBOXED_VALUE _ulr_stackbox_tmp
+
+// End StackBox macro
+
 /*
 	This file includes the headers necessary for full ULR interaction. All ULR compilations should
 	include this header and accept a ULRAPIImpl* instance as an argument to their InitAssembly function.

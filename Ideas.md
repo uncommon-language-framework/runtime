@@ -11,6 +11,7 @@ MyAssembly.dll
 		- public -> `p`
 		- private -> none, there is no other access modifier present
 		- protected -> `t`
+		- interface -> `e`
 		- internal -> `i`
 		- static -> `s`
 		- readonly -> `r`

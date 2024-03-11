@@ -91,6 +91,9 @@ namespace ULR::Loader
 					case 'c':
 						class_type = TypeType::Class;
 						break;
+					case 'e':
+						class_type = TypeType::Interface;
+						break;
 					case 'v':
 						class_type = TypeType::Struct;
 					case 'r':
