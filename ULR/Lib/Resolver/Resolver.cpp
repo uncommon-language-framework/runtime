@@ -148,6 +148,57 @@ namespace ULR::Resolver
 		return nullptr;
 	}
 
+	MethodInfo* ULRAPIImpl::GetNonNewMethod(Type* type, char name[], std::vector<Type*> argsignature, int bindingflags)
+	{
+		if (bindingflags & BindingFlags::Instance)
+		{
+			for (auto& member : type->inst_attrs[name])
+			{
+				if (member->decl_type & MemberType::Method)
+				{
+					MethodInfo* casted = (MethodInfo*) member;
+
+					if (casted->attrs & Modifiers::New && !(casted->attrs & Modifiers::Virtual)) continue;
+
+					if (casted->argsig == argsignature)
+					{
+						if (member->attrs & Modifiers::Public)
+						{
+							if(bindingflags & BindingFlags::Public) return casted;
+						}
+						else if (bindingflags & BindingFlags::NonPublic) return casted;
+					}
+				}
+			}
+		}
+
+		if (bindingflags & BindingFlags::Static)
+		{
+			for (auto& member : type->static_attrs[name])
+			{
+				if (member->decl_type & MemberType::Method)
+				{
+					MethodInfo* casted = (MethodInfo*) member;
+
+					if (casted->attrs & Modifiers::New && !(casted->attrs & Modifiers::Virtual)) continue;
+
+					if (casted->argsig == argsignature)
+					{
+						if (member->attrs & Modifiers::Public)
+						{
+							if(bindingflags & BindingFlags::Public) return casted;
+						}
+						else if (bindingflags & BindingFlags::NonPublic) return casted;
+					}
+				}
+			}
+		}
+
+		if (type->immediate_base) return GetNonNewMethod(type->immediate_base, name, argsignature, bindingflags);
+
+		return nullptr;
+	}
+
 	FieldInfo* ULRAPIImpl::GetField(Type* type, char name[], int bindingflags)
 	{
 		if (bindingflags & BindingFlags::Instance)
@@ -251,13 +302,6 @@ namespace ULR::Resolver
 		if (assembly->types.count(full_qual_typename) != 0) return assembly->types[full_qual_typename];
 
 		throw std::runtime_error("second fault") /* new TypeNotFound exc */;
-	}
-
-	Type* ULRAPIImpl::GetTypeOf(char* obj)
-	{
-		Type** type_ptr_extract = reinterpret_cast<Type**>(obj);
-
-		return type_ptr_extract[0];
 	}
 	
 	char* ULRAPIImpl::AllocateObject(size_t size)

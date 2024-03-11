@@ -18,4 +18,5 @@ namespace ULR::Loader
 	Assembly* LoadAssembly(char* dll, Resolver::ULRAPIImpl* api);
 	Type* GetType(char* qual_name);
 	std::vector<Type*> ParseArgs(size_t* i, char* meta);
+	void PopulateVtable(Type* type);
 }

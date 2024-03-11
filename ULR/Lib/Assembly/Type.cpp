@@ -334,5 +334,12 @@ namespace ULR
 				delete member;
 			}
 		}
+
+		delete[] primary_vtable;
+
+		for (auto& entry : interface_vtable)
+		{
+			delete[] entry.second;
+		}
 	}
 }

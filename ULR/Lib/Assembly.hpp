@@ -51,7 +51,8 @@ namespace ULR
 		Abstract = 1 << 6,
 		Partial = 1 << 7,
 		Extern = 1 << 8,
-		Sealed = 1 << 9
+		Sealed = 1 << 9,
+		New = 1 << 10,
 	};
 
 	struct cmp_chr_ptr
@@ -99,6 +100,10 @@ namespace ULR
 			std::vector<Type*> type_args;
 			
 			Type* element_type; // if the type is an array type
+
+			void** primary_vtable; // populate this at the end of loading using reflection
+			size_t primary_vtable_len;
+			std::unordered_map<Type*, void**> interface_vtable;
 
 			Type(
 				TypeType decl_type,

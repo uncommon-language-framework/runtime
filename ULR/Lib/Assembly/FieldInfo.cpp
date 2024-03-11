@@ -1,6 +1,6 @@
 #include "../Resolver.hpp"
 
- ULR::Resolver::ULRAPIImpl* internal_api = nullptr;
+ULR::Resolver::ULRAPIImpl* internal_api = nullptr;
 
 namespace ULR
 {

@@ -61,12 +61,13 @@ namespace ULR::Resolver
 			DestructorInfo* GetDtor(Type* type);
 
 			MethodInfo* GetMethod(Type* type, char name[], std::vector<Type*> argsignature, int bindingflags);
+			MethodInfo* GetNonNewMethod(Type* type, char name[], std::vector<Type*> argsignature, int bindingflags); // this is solely for the virtual table loader
 			FieldInfo* GetField(Type* type, char name[], int bindingflags);
 			PropertyInfo* GetProperty(Type* type, char name[], int bindingflags);
 			
 			Type* GetType(char full_qual_typename[]);
 			Type* GetType(char full_qual_typename[], char assembly_hint[]);
-			Type* GetTypeOf(char* obj);
+			inline Type* GetTypeOf(char* obj) { return *reinterpret_cast<Type**>(obj); } // special inline decl because this is a highly used small API function (for vcalls, so it has to be fast)
 			
 			char* AllocateObject(size_t size);
 			char* AllocateZeroed(size_t size);

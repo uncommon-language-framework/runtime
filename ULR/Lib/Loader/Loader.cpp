@@ -1,9 +1,15 @@
 #include "../Loader.hpp"
+#include "../Resolver.hpp"
 #include <memory>
 #include <iostream>
 #include <string>
 #include <map>
+#include <unordered_map>
 #include <vector>
+
+using ULR::Resolver::BindingFlags;
+
+extern ULR::Resolver::ULRAPIImpl* internal_api;
 
 namespace ULR::Loader
 {
@@ -309,6 +315,12 @@ namespace ULR::Loader
 								case 't':
 									attrs |= Modifiers::Protected;
 									break;
+								case 'n':
+									attrs |= Modifiers::New;
+									break;
+								case 'v':
+									attrs |= Modifiers::Virtual; // should always be false
+									break;
 								case 'r':
 									attrs |= Modifiers::Readonly;
 									break;
@@ -351,6 +363,12 @@ namespace ULR::Loader
 									break;
 								case 't':
 									attrs |= Modifiers::Protected;
+									break;
+								case 'n':
+									attrs |= Modifiers::New;
+									break;
+								case 'v': 
+									attrs |= Modifiers::Virtual; // should always be false
 									break;
 								case 's':
 									attrs |= Modifiers::Static; // should always be true
@@ -423,6 +441,9 @@ namespace ULR::Loader
 									break;
 								case 's':
 									attrs |= Modifiers::Static;
+									break;
+								case 'n':
+									attrs |= Modifiers::New;
 									break;
 								case 'r':
 									attrs |= Modifiers::Readonly;
@@ -503,6 +524,12 @@ namespace ULR::Loader
 									break;
 								case 'r':
 									attrs |= Modifiers::Readonly;
+									break;
+								case 'n':
+									attrs |= Modifiers::New;
+									break;
+								case 'v':
+									attrs |= Modifiers::Virtual;
 									break;
 								case 'g':
 									has_getter = true;
@@ -618,6 +645,12 @@ namespace ULR::Loader
 						case 'a':
 							attrs |= Modifiers::Abstract;
 							break;
+						case 'n':
+							attrs |= Modifiers::New;
+							break;
+						case 'v':
+							attrs |= Modifiers::Virtual;
+							break;
 						case 's':
 							attrs |= Modifiers::Static; // should always be true
 							break;
@@ -672,6 +705,15 @@ namespace ULR::Loader
 		}
 		
 		LoadedAssemblies[assembly->name] = assembly;
+
+		/* populate vtables */
+
+		for (auto& entry : assembly->types)
+		{
+			PopulateVtable(entry.second);
+		}
+
+		/* end vtable impl */
 
 		void (*init_asm)(Resolver::ULRAPIImpl*) = (void (*)(Resolver::ULRAPIImpl*)) GetProcAddress(assembly->handle, "InitAssembly");
 
@@ -747,5 +789,99 @@ namespace ULR::Loader
 		}
 
 		throw std::runtime_error("Type not found");
+	}
+
+	// TODO: make this work for props (prob just add the prop MethodInfos to type attrs during loading)
+	// NOTE: must be called after loading
+	// TODO: remove a LOT of duplicate work here
+	void PopulateVtable(Type* type)
+	{
+		/* Begin Primary Vtable */
+
+		std::vector<Type*> type_heirarchy;
+		std::vector<Type*> impld_interfaces;
+
+		Type* curr_type = type;
+
+		while (curr_type)
+		{
+			type_heirarchy.emplace(type_heirarchy.begin(), curr_type);
+
+			impld_interfaces.insert(impld_interfaces.end(), curr_type->interfaces.begin(), curr_type->interfaces.end());
+
+			curr_type = curr_type->immediate_base;
+		}
+
+		std::vector<MethodInfo*> vfuncs;
+
+		for (Type* parent : type_heirarchy)
+		{
+			for (auto& entry : parent->inst_attrs)
+			{
+				if (entry.second[0]->decl_type == MemberType::Method)
+				{
+					for (auto& member : entry.second)
+					{
+						MethodInfo* method = (MethodInfo*) member;
+
+						if (method->attrs & Modifiers::Virtual) vfuncs.emplace_back(method);
+					}
+				}
+			}
+		}
+
+		void** vtable = new void*[vfuncs.size()];
+
+		for (size_t i = 0; i < vfuncs.size(); i++)
+		{
+			MethodInfo* info = vfuncs[i];
+
+			MethodInfo* impl = internal_api->GetNonNewMethod(type, info->name, info->argsig, BindingFlags::Public | BindingFlags::NonPublic | BindingFlags::Instance);
+
+			vtable[i] = impl->offset;
+		}
+
+		type->primary_vtable = vtable;
+
+		/* End Primary Vtable */
+
+
+
+		/* Begin Interface Vtable */
+
+		std::unordered_map<Type*, void**> interface_vtable;
+
+		for (Type* intfc : impld_interfaces)
+		{
+			std::vector<MethodInfo*> intfc_vfuncs;
+
+			for (auto& entry : intfc->inst_attrs)
+			{
+				if (entry.second[0]->decl_type == MemberType::Method)
+				{
+					for (auto& member : entry.second)
+					{
+						intfc_vfuncs.emplace_back((MethodInfo*) member);
+					}
+				}
+			}
+
+			void** intfc_specific_vtable = new void*[intfc_vfuncs.size()];
+
+			for (size_t i = 0; i < intfc_vfuncs.size(); i++)
+			{
+				MethodInfo* info = intfc_vfuncs[i];
+
+				MethodInfo* impl = internal_api->GetNonNewMethod(type, info->name, info->argsig, BindingFlags::Public | BindingFlags::Instance);
+
+				intfc_specific_vtable[i] = impl->offset;
+			}
+
+			interface_vtable[intfc] = intfc_specific_vtable;
+		}
+
+		type->interface_vtable = interface_vtable;
+
+		/* End Interface Vtable */
 	}
 }

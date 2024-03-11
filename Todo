@@ -17,3 +17,4 @@
 - have loader support all valid modifiers for different attributes
 - add static ctor support
 - test backtrace printing external DLL names
+- remove switch case blocks in Loader that are always true or false
