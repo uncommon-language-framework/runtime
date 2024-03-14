@@ -100,7 +100,7 @@ if  ($args[2] -ne "libonly")
 		if ((IsCachedOrStoreIfNot((Get-Item "ulrhost.cpp").FullName)) -eq 0) { g++64 "ulrhost.cpp" -c -masm=intel -Wno-write-strings -std=c++17 -ldbghelp }
 		if ((IsCachedOrStoreIfNot((Get-Item "Lib/Loader/Loader.cpp").FullName)) -eq 0) { g++64 "Lib/Loader/Loader.cpp" -c -masm=intel -Wno-write-strings -std=c++17 -ldbghelp }
 
-		Move-Item *.o ObjCache/Obj -Forces
+		Move-Item *.o ObjCache/Obj -Force
 
 		g++64 "ObjCache/Obj/ulrhost.o" "ULR.NativeLib.dll" "ObjCache/Obj/Loader.o" -o ulrhost.exe -masm=intel -Wno-write-strings -std=c++17 -ldbghelp
 	}

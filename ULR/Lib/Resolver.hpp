@@ -4,13 +4,8 @@
 #include <type_traits>
 #include <set>
 
-#define MB *1000000
-#define GB *(1000 MB)
-#define MAX_OBJ_SIZE 1 GB
-#define GC_TRIGGER_SIZE 2 GB
-#define MAX_TRACEBACK 30
-
 #pragma once
+
 
 namespace ULR::Resolver
 {
@@ -26,8 +21,8 @@ namespace ULR::Resolver
 	struct GCResult
 	{
 		public:
-			size_t size_collected;
-			size_t num_collected;
+			size_t size_collected = 0;
+			size_t num_collected = 0;
 	};
 
 	class ULRAPIImpl
@@ -39,7 +34,11 @@ namespace ULR::Resolver
 
 		size_t prev_size_accessible = 0;
 
+		char** gc_lclsearch_begin;
+		char** gc_lclsearch_end;
+
 		public:
+			GCResult last_gc_result;
 			std::map<char*, size_t> allocated_objs;
 			size_t allocated_size = 0;
 
@@ -95,6 +94,8 @@ namespace ULR::Resolver
 			std::set<char*> ExamineRoot(char* root);
 			std::set<char*> ExamineRoots(std::set<char*> roots);
 			GCResult Collect();
+			void InitGCLocalVarRoot(char** stackaddr);
+			void InitGCLocalVarEnd(char** stackaddr);
 
 			template <typename ValueType>
 			char* Box(ValueType& obj, Type* typeptr)

@@ -33,7 +33,7 @@ char* generate_ulr_argv(int argc, char* argv[])
 		ulr_args[i] = special_string_MAKE_FROM_LITERAL(argv[i+1], strlen(argv[i+1]));
 	}
 
-	Type* StringArrayType = Loader::LoadedAssemblies["ULR.<ArrayTypes>"]->types["[System]String[]"];
+	Type* StringArrayType = Loader::GetType("[System]String[]");
 
 	char* arr = special_array_from_ptr(ulr_args, argc-1, StringArrayType);
 
@@ -91,17 +91,16 @@ int main(int argc, char* argv[])
 	special_string_MAKE_FROM_LITERAL = (char* (*)(char*, int)) lclapi.LocateSymbol(stdlibasm, "special_string_MAKE_FROM_LITERAL");
 	special_array_from_ptr = (char* (*)(void*, int, Type*)) lclapi.LocateSymbol(stdlibasm, "special_array_from_ptr");
 	
-	if (ArrayTypeAssembly->types.count("[System]String[]") == 0) //  if System.String[] (string[]) not already loaded (or is a nullptr for some reason)
-	{
-		Type* StringArrayType = new Type(TypeType::ArrayType, ArrayTypeAssembly, strdup("[System]String[]"), Modifiers::Public | Modifiers::Sealed, 0, { }, lclapi.GetType("[System]Object"), lclapi.GetType("[System]String"));
-		ArrayTypeAssembly->types[StringArrayType->name] =  StringArrayType;
-	}
-
 	char* ulr_args_arr_obj = generate_ulr_argv(argc, argv);
 
 	int retcode;
 	
-	try { retcode = mainasm->entry(ulr_args_arr_obj); }
+	try
+	{
+		lclapi.InitGCLocalVarRoot((char**) &retcode);
+
+		retcode = mainasm->entry(ulr_args_arr_obj);
+	}
 	catch (char* exc)
 	{
 		Type* SystemException = lclapi.GetTypeOf(exc); // OR GetType("[System]Exception", "System.Runtime.Native.dll")
@@ -150,12 +149,12 @@ int main(int argc, char* argv[])
 	for (auto& entry : Loader::ReadAssemblies) allocated_asms.emplace(entry.second);
 	for (auto& entry : Loader::LoadedAssemblies) allocated_asms.emplace(entry.second);
 
-	for (auto& allocated_assembly : allocated_asms)
+	for (auto allocated_assembly : allocated_asms)
 	{
 		delete allocated_assembly;
 	}
 
-	for (auto& placeholder : Loader::alloced_generic_placeholders)
+	for (auto placeholder : Loader::alloced_generic_placeholders)
 	{
 		delete placeholder;
 	}

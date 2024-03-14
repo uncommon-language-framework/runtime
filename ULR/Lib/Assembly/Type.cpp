@@ -316,7 +316,7 @@ namespace ULR
 	}
 
 	Type::~Type()
-	{
+	{			
 		free(name);
 		
 		for (auto& entry : static_attrs)

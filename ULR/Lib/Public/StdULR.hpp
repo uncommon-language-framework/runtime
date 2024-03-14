@@ -27,7 +27,6 @@ using sizeof_ns1_System_Boolean = bool;
 
 // End native type definition
 
-
 // Define a macro for boxing imitation without dynamic allocation
 
 #define ULR_USE_STACKBOX() char* _ulr_stackbox_tmp

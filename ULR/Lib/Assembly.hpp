@@ -141,10 +141,9 @@ namespace ULR
 		public:
 			unsigned char num;
 
-			GenericPlaceholder(unsigned char generic_num) :
-				Type(TypeType::Class, nullptr, strdup(""), 0, 0, std::vector<Type*>(), nullptr, false, 0),
-				num(generic_num) {};
-			bool IsGenericPlaceholder() { return true; }
+			GenericPlaceholder(unsigned char generic_num);
+			bool IsGenericPlaceholder();
+			~GenericPlaceholder();
 	};
 
 	class MethodInfo : public MemberInfo

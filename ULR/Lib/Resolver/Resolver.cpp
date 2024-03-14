@@ -9,6 +9,13 @@
 #define COLOR_FIELD_BLUE "\u001b[36m"
 #define COLOR_END "\u001b[0m"
 
+constexpr size_t operator"" _mb(size_t x) { return x*1000000; }
+constexpr size_t operator"" _gb(size_t x) { return x*1000_mb; }
+
+const size_t MAX_OBJECT_SIZE = 100_mb;
+const size_t GC_TRIGGER_SIZE = 2_gb;
+const size_t MAX_TRACEBACK = 30;
+
 namespace ULR::Resolver
 {
 	ULRAPIImpl::ULRAPIImpl(
@@ -265,7 +272,7 @@ namespace ULR::Resolver
 	{
 		std::vector<MemberInfo*> dtors = type->static_attrs[".dtor"];
 
-		if (dtors.size() == 0) throw /* new NoDestructor exc */;
+		if (dtors.size() == 0) return nullptr;
 
 		return (DestructorInfo*) dtors[0];
 	}
@@ -306,20 +313,50 @@ namespace ULR::Resolver
 	
 	char* ULRAPIImpl::AllocateObject(size_t size)
 	{
-		if (allocated_size+size > GC_TRIGGER_SIZE && ((allocated_size+size) - prev_size_accessible) > 10 MB) Collect();
+		if ((allocated_size+size > GC_TRIGGER_SIZE) && (((allocated_size+size) - prev_size_accessible) > 10_mb))
+		{
+			char* framebase;
+
+			asm(
+				"mov %0, rbp\n\t"
+				:"=r"(framebase)
+			);
+
+			// since framebase is the endpoint, if we don't add to the pointer to advance past it, it shouldn't be read by the GC (just saving one pointer deref for the GC)
+
+			internal_api->InitGCLocalVarEnd((char**) framebase);
+
+			Collect();
+		}
 
 		return AllocateObjectNoGC(size);
 	}
 
 	char* ULRAPIImpl::AllocateZeroed(size_t size)
 	{
-		if (allocated_size+size > GC_TRIGGER_SIZE && ((allocated_size+size) - prev_size_accessible) > 10 MB) Collect();
+		if ((allocated_size+size > GC_TRIGGER_SIZE) && (((allocated_size+size) - prev_size_accessible) > 10_mb))
+		{
+			char* framebase;
+
+			asm(
+				"mov %0, rbp\n\t"
+				:"=r"(framebase)
+			);
+
+			// since framebase is the endpoint, if we don't add to the pointer to advance past it, it shouldn't be read by the GC (just saving one pointer deref for the GC)
+
+			internal_api->InitGCLocalVarEnd((char**) framebase);
+
+			Collect();
+		}
 
 		return AllocateZeroedNoGC(size);
 	}
 
 	char* ULRAPIImpl::AllocateObjectNoGC(size_t size)
 	{
+		if (size > MAX_OBJECT_SIZE) return nullptr; // TODO: have this throw a ULR exc
+
 		char* mem = (char*) malloc(size);
 
 		allocated_objs.emplace(mem, size);
@@ -331,6 +368,8 @@ namespace ULR::Resolver
 
 	char* ULRAPIImpl::AllocateZeroedNoGC(size_t size)
 	{
+		if (size > MAX_OBJECT_SIZE) return nullptr; // TODO: have this throw a ULR exc
+
 		char* mem = (char*) calloc(size, 1);
 
 		allocated_objs.emplace(mem, size);
@@ -346,11 +385,61 @@ namespace ULR::Resolver
 
 		Type* root_type = GetTypeOf(root);
 
+		if (root_type->decl_type == TypeType::ArrayType) // iterate through array elems so the GC can register them
+		{
+			if (IsBoxableStruct(root_type->element_type))
+			{
+				size_t elem_size = root_type->element_type->size;
+				
+				Type** stackboxbuf = (Type**) alloca(elem_size);
+
+				stackboxbuf[0] = root_type->element_type;
+
+				char* elems_ptr = (char*) ((int*) (((Type**) root)+1)+1);
+
+				int len = *((int*) (((Type**) root)+1));
+
+				char* elems_end = elems_ptr+((len)*elem_size);
+
+				for (; elems_ptr < elems_end; elems_ptr+=elem_size)
+				{
+					memcpy(stackboxbuf+1, elems_ptr, elem_size);
+
+					auto found_from_elem = ExamineRoot((char*) stackboxbuf);
+
+					found.insert(found_from_elem.begin(), found_from_elem.end());
+				}
+
+				return found;
+			}
+
+			size_t elem_size = sizeof(void*);
+
+			char* elems_ptr = (char*) ((int*) (((Type**) root)+1)+1);
+
+			int len = *((int*) (((Type**) root)+1));
+
+			char* elems_end = elems_ptr+((len)*elem_size);
+
+			for (; elems_ptr < elems_end; elems_ptr+=elem_size)
+			{
+				char* elem_obj = *(char**) elems_ptr;
+
+				auto found_from_elem = ExamineRoot(elem_obj);
+
+				found.insert(found_from_elem.begin(), found_from_elem.end());
+			}
+
+			return found;			
+		}
+
 		for (auto& entry : root_type->inst_attrs)
 		{
 			if (entry.second[0]->decl_type == MemberType::Field)
 			{
 				FieldInfo* field = (FieldInfo*) entry.second[0];
+
+				std::cout << GetDisplayNameOf(field) << std::endl;
 
 				char* fieldval = field->GetValue(root);
 
@@ -383,21 +472,23 @@ namespace ULR::Resolver
 
 	GCResult ULRAPIImpl::Collect()
 	{
-		std::set<char*> roots; // aggregate a list of all registered locals
+		std::set<char*> roots; // aggregate a list of all local var ptrs & static field vals
+
+		for (char** addr = gc_lclsearch_end; addr < gc_lclsearch_begin; addr++)
+		{
+			/*
+			 if an allocated ptr is found on the stack, mark it as a root.
+			 Note that this will also pickup integer and other valuetype data that looks like a valid pointer;
+			 however, because of the unlikeliness of the situation and the fact that the runtime cleans up all 
+			 allocations at the end of the program anyway, this issue will not be resolved at the moment since 
+			 it shouldn't impact application behavior
+			*/
+
+			if (allocated_objs.count(*addr)) roots.emplace(*addr);
+		}
 
 		for (auto& entry : *assemblies)
 		{
-			// NOTE: BELOW IS BROKEN FOR VALUE TYPES, TODO: FIX
-			// add local var addrs to roots
-			for (size_t i = 0; i < entry.second->localslen; i++)
-			{
-				char* lcladdr = entry.second->locals[i];
-
-				if (lcladdr == nullptr) continue;
-
-				roots.emplace(lcladdr); // add the local var to the application root
-			}
-
 			// add static roots to local var roots
 			for (auto& type_entry : entry.second->types)
 			{
@@ -405,7 +496,11 @@ namespace ULR::Resolver
 				{
 					if (static_entry.second[0]->decl_type == MemberType::Field)
 					{
-						roots.emplace(((FieldInfo*) static_entry.second[0])->GetValue(nullptr));
+						char* fieldval = ((FieldInfo*) static_entry.second[0])->GetValue(nullptr);
+
+						// std::cout << (void*) fieldval << ' ' << GetDisplayNameOf(static_entry.second[0]) << std::endl;
+
+						roots.emplace(fieldval);
 					}
 				}
 			}
@@ -428,7 +523,10 @@ namespace ULR::Resolver
 
 				Type* objtype = GetTypeOf(alloced);
 
-				GetDtor(objtype)->Invoke(alloced); // call destructor
+				// call destructor before destroying obj
+				DestructorInfo* dtor = GetDtor(objtype);
+				if (dtor) dtor->Invoke(alloced); // only call dtor if it exists
+				
 
 				free(alloced);
 
@@ -440,7 +538,19 @@ namespace ULR::Resolver
 
 		prev_size_accessible = allocated_size;
 
+		last_gc_result = result;
+
 		return result;
+	}
+
+	void ULRAPIImpl::InitGCLocalVarRoot(char** stackaddr)
+	{
+		gc_lclsearch_begin = stackaddr;
+	}
+
+	void ULRAPIImpl::InitGCLocalVarEnd(char** stackaddr)
+	{
+		gc_lclsearch_end = stackaddr;
 	}
 
 	Assembly* ULRAPIImpl::ResolveAddressToAssembly(void* addr)

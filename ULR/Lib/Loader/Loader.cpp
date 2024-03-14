@@ -786,6 +786,8 @@ namespace ULR::Loader
 
 			Type* array_type = new Type(TypeType::ArrayType, ArrayTypeAssembly, strdup(qual_name), Modifiers::Public | Modifiers::Sealed, 0, { }, GetType("[System]Object"), elem_type);
 
+			PopulateVtable(array_type);
+
 			ArrayTypeAssembly->types[array_type->name] = array_type; // use array_type->name because it is guaranteed to be dynamically allocated and last as long as array_type lasts
 
 			return array_type;

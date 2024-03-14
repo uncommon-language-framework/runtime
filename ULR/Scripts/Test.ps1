@@ -6,3 +6,9 @@ if ($args[0].ToLower() -in ("new", "create"))
 
 if ($args[0].ToLower() -in ("remove", "del"))
 { Scripts/Del-Test $args[1] }
+
+if ($args[0].ToLower() -in ("debug", "dbg"))
+{ Scripts/Debug-Test $args[1] }
+
+if ($args[0].ToLower() -in ("memcheck", "mem"))
+{ Scripts/Mem-Test $args[1] }

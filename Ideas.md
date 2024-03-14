@@ -34,3 +34,6 @@ MyAssembly.dll
 - for returning value types, return a cpp type with the size of the value type (some sort of buffer inside the cpp type)
 - for dynamic calls, everything is boxed, and the internals will unbox args if needed
 - for overloads, use the following naming convention to be foolproof: `overloadX_nsX_...`, and have all other symbols start with their `nsX` prefixes
+- For GC, it could be instantiated with addresses of stack vars as certain flags (e.g. struct here, ptr here)
+	- Beware of ref ptrs within structs
+- C$ compiler should pad value types itself to align so that GC can function

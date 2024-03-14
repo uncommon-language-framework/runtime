@@ -10,7 +10,7 @@ void InitAssembly(ULRAPIImpl* ulr)
 	internal_api = ulr;
 }
 
-void overload0_ns0_Program_ctor(char* self) {}
+void overload0_ns0_Program_ctor(char* self) { }
 
 sizeof_ns1_System_Int32 overload0_ns0_Program_Main(char* argv)
 {
