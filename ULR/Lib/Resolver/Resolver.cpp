@@ -324,7 +324,7 @@ namespace ULR::Resolver
 
 			// since framebase is the endpoint, if we don't add to the pointer to advance past it, it shouldn't be read by the GC (just saving one pointer deref for the GC)
 
-			internal_api->InitGCLocalVarEnd((char**) framebase);
+			internal_api->InitGCLocalVarEnd((char**) framebase, std::this_thread::get_id());
 
 			Collect();
 		}
@@ -345,7 +345,7 @@ namespace ULR::Resolver
 
 			// since framebase is the endpoint, if we don't add to the pointer to advance past it, it shouldn't be read by the GC (just saving one pointer deref for the GC)
 
-			internal_api->InitGCLocalVarEnd((char**) framebase);
+			internal_api->InitGCLocalVarEnd((char**) framebase, std::this_thread::get_id());
 
 			Collect();
 		}
@@ -472,19 +472,30 @@ namespace ULR::Resolver
 
 	GCResult ULRAPIImpl::Collect()
 	{
+		if (!gc_lock.try_lock()) // another thread is already GCing, just exit
+			return;
+
+		// TODO: get end addrs from all threads
+
 		std::set<char*> roots; // aggregate a list of all local var ptrs & static field vals
 
-		for (char** addr = gc_lclsearch_end; addr < gc_lclsearch_begin; addr++)
+		for (auto& entry : gc_lclsearch_addrs) // search locals for all threads
 		{
-			/*
-			 if an allocated ptr is found on the stack, mark it as a root.
-			 Note that this will also pickup integer and other valuetype data that looks like a valid pointer;
-			 however, because of the unlikeliness of the situation and the fact that the runtime cleans up all 
-			 allocations at the end of the program anyway, this issue will not be resolved at the moment since 
-			 it shouldn't impact application behavior
-			*/
+			char** gc_lclsearch_end = entry.second.first;
+			char** gc_lclsearch_begin = entry.second.second; // TODO: fix (we don't know if a thread will have an endval when GC starts up)
+			
+			for (char** addr = gc_lclsearch_end; addr < gc_lclsearch_begin; addr++)
+			{
+				/*
+				if an allocated ptr is found on the stack, mark it as a root.
+				Note that this will also pickup integer and other valuetype data that looks like a valid pointer;
+				however, because of the unlikeliness of the situation and the fact that the runtime cleans up all 
+				allocations at the end of the program anyway, this issue will not be resolved at the moment since 
+				it shouldn't impact application behavior
+				*/
 
-			if (allocated_objs.count(*addr)) roots.emplace(*addr);
+				if (allocated_objs.count(*addr)) roots.emplace(*addr);
+			}
 		}
 
 		for (auto& entry : *assemblies)
@@ -540,17 +551,19 @@ namespace ULR::Resolver
 
 		last_gc_result = result;
 
+		gc_lock.unlock();
+
 		return result;
 	}
 
-	void ULRAPIImpl::InitGCLocalVarRoot(char** stackaddr)
+	void ULRAPIImpl::InitGCLocalVarRoot(char** stackaddr, std::thread::id id)
 	{
-		gc_lclsearch_begin = stackaddr;
+		gc_lclsearch_addrs[id].first = stackaddr;
 	}
 
-	void ULRAPIImpl::InitGCLocalVarEnd(char** stackaddr)
+	void ULRAPIImpl::InitGCLocalVarEnd(char** stackaddr, std::thread::id id)
 	{
-		gc_lclsearch_end = stackaddr;
+		gc_lclsearch_addrs[id].second = stackaddr;
 	}
 
 	Assembly* ULRAPIImpl::ResolveAddressToAssembly(void* addr)

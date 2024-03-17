@@ -3,6 +3,8 @@
 #include <iostream>
 #include <type_traits>
 #include <set>
+#include <thread>
+#include <mutex>
 
 #pragma once
 
@@ -34,8 +36,9 @@ namespace ULR::Resolver
 
 		size_t prev_size_accessible = 0;
 
-		char** gc_lclsearch_begin;
-		char** gc_lclsearch_end;
+		std::map<std::thread::id, std::pair<char**, char**>> gc_lclsearch_addrs;
+
+		std::mutex gc_lock;
 
 		public:
 			GCResult last_gc_result;
@@ -94,8 +97,8 @@ namespace ULR::Resolver
 			std::set<char*> ExamineRoot(char* root);
 			std::set<char*> ExamineRoots(std::set<char*> roots);
 			GCResult Collect();
-			void InitGCLocalVarRoot(char** stackaddr);
-			void InitGCLocalVarEnd(char** stackaddr);
+			void InitGCLocalVarRoot(char** stackaddr, std::thread::id id);
+			void InitGCLocalVarEnd(char** stackaddr, std::thread::id id);
 
 			template <typename ValueType>
 			char* Box(ValueType& obj, Type* typeptr)

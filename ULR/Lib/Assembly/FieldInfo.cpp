@@ -23,18 +23,23 @@ namespace ULR
 	// assume that the arg types are valid
 	char* FieldInfo::GetValue(char* self)
 	{
+		size_t add_offset = 0;
+
+		// note we add a sizeof(Type*) offset here because the struct offset numbers don't take the vtable pointer into account; we must add it here to get the correct offset
+		if (parent_type->decl_type == TypeType::Struct) add_offset = sizeof(Type*);
+
 		if (valtype->decl_type != TypeType::Struct)
 		{
 			if (is_static) return *((char**) offset);
 		
-			return *(char**) (((char*) self)+((size_t) offset));
+			return *(char**) (((char*) self)+add_offset+((size_t) offset));
 		}
 
 		void* objstart;
 		size_t objsize = valtype->size;
 
 		if (is_static) objstart = offset;
-		else objstart = ((char*) self)+((size_t) offset);	
+		else objstart = ((char*) self)+add_offset+((size_t) offset);
 
 		Type** boxed = (Type**) internal_api->AllocateObject(sizeof(Type*)+objsize);
 		

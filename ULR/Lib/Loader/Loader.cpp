@@ -344,6 +344,16 @@ namespace ULR::Loader
 						continue;
 					}
 
+					// this is a strncmp of 5 because .dtor decls have no space
+					if (strncmp(&meta[i], ".dtor", 5) == 0) // destructor
+					{
+						i+=6; // skip the semicolon too (5+1 chars)
+
+						if (is_generic) type->AddStaticMember(new DestructorInfo(nullptr, Modifiers::Private, true, (char*) addr[nummember]));
+						else type->AddStaticMember(new DestructorInfo(addr[nummember], Modifiers::Private, false));
+
+					}
+
 					if (strncmp(&meta[i], ".entr ", 6) == 0) // entrypoint
 					{
 						int attrs = Modifiers::Private;

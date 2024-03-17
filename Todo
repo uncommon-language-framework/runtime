@@ -4,17 +4,14 @@
 	- impl the GC side logic for this (gc also needs to be able to look through threads)
 - add arg passing in MethodInvoke where the first four args are also placed on the stack (find if this is required first)
 - finish ConstructorInfo::Invoke method (should just be like methodinfo but with self as first arg and returning nothing)
-- efficient vtable for vcalls
 - add methodinvoke for non win64 systems
-- add gc logic which searches thru arrays (and spans in the future)
 - change some reinterpret casts in stdlib to normal casts
-- exceptions
-- add inheritance and generic type parsing from metadata
-	- interface implementation
-- add runtime member reordering for runtime inheritance once dynamic type generation is allowed
+- add runtime member reordering for runtime inheritance once dynamic type generation is allowed (field reordering)
 - dynamic generic type generation
-- add destructor loading
+- prebuilt generic type loading
+- array type deps loading from metadata ^
 - have loader support all valid modifiers for different attributes
-- add static ctor support
-- test backtrace printing external DLL names
+- add static ctor support - marked as will not add - decided that compilers should manage static ctors themselves
 - remove switch case blocks in Loader that are always true or false
+- allow assemblies to specify deps & look for circular deps
+- allow ULRAPI to create array type objects (just move the loader logic to ULRAPI & have loader delegate to it)
