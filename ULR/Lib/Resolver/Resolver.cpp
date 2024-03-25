@@ -1,5 +1,6 @@
 #include "../Resolver.hpp"
 #include <dbghelp.h>
+#include <winternl.h>
 #include <sstream>
 
 #define COLOR_INTEGER "\u001b[1m" // bold actually
@@ -324,7 +325,7 @@ namespace ULR::Resolver
 
 			// since framebase is the endpoint, if we don't add to the pointer to advance past it, it shouldn't be read by the GC (just saving one pointer deref for the GC)
 
-			internal_api->InitGCLocalVarEnd((char**) framebase, std::this_thread::get_id());
+			internal_api->InitGCLocalVarEnd((char**) framebase);
 
 			Collect();
 		}
@@ -345,7 +346,7 @@ namespace ULR::Resolver
 
 			// since framebase is the endpoint, if we don't add to the pointer to advance past it, it shouldn't be read by the GC (just saving one pointer deref for the GC)
 
-			internal_api->InitGCLocalVarEnd((char**) framebase, std::this_thread::get_id());
+			internal_api->InitGCLocalVarEnd((char**) framebase);
 
 			Collect();
 		}
@@ -355,7 +356,13 @@ namespace ULR::Resolver
 
 	char* ULRAPIImpl::AllocateObjectNoGC(size_t size)
 	{
-		if (size > MAX_OBJECT_SIZE) return nullptr; // TODO: have this throw a ULR exc
+		alloc_lock.lock(); // another thread is GCing/allocating, don't interfere by allocating new objects (even though this is NoGC, that just means it won't trigger a collection, it still needs to be aware of the GC because it still emplaces objects)
+
+		if (size > MAX_OBJECT_SIZE)
+		{
+			alloc_lock.unlock();
+			return nullptr; // TODO: have this throw a ULR exc
+		}
 
 		char* mem = (char*) malloc(size);
 
@@ -363,18 +370,28 @@ namespace ULR::Resolver
 
 		allocated_size+=size;
 
+		alloc_lock.unlock();
+
 		return mem;
 	}
 
 	char* ULRAPIImpl::AllocateZeroedNoGC(size_t size)
 	{
-		if (size > MAX_OBJECT_SIZE) return nullptr; // TODO: have this throw a ULR exc
+		alloc_lock.lock(); // another thread is GCing/allocing, don't interfere by allocating new objects (even though this is NoGC, that just means it won't trigger a collection, it still needs to be aware of the GC because it still emplaces objects)
+
+		if (size > MAX_OBJECT_SIZE)
+		{
+			gc_lock.unlock();
+			return nullptr; // TODO: have this throw a ULR exc
+		}
 
 		char* mem = (char*) calloc(size, 1);
 
 		allocated_objs.emplace(mem, size);
 
 		allocated_size+=size;
+
+		alloc_lock.unlock();
 		
 		return mem;
 	}
@@ -475,7 +492,29 @@ namespace ULR::Resolver
 		if (!gc_lock.try_lock()) // another thread is already GCing, just exit
 			return;
 
+		alloc_lock.lock(); // do not allow any allocation during collection
+
 		// TODO: get end addrs from all threads
+
+		std::map<pthread_t, bool> doneflags;
+
+		for (auto& thread : gc_lclsearch_addrs)
+		{
+			if (thread.first == GetCurrentThreadId()) continue; // don't relog or suspend our thread
+
+			HANDLE thread_handle = OpenThread(THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT, false, thread.first);
+			
+			CONTEXT threadctx;
+			
+			if (!GetThreadContext(thread_handle, &threadctx))
+			{
+				abort(); // should be ULR exc later
+			}
+
+			gc_lclsearch_addrs[thread.first].second = (char**) threadctx.Rsp; // register end of addressable stack for the thread
+
+			SuspendThread(thread_handle);
+		}
 
 		std::set<char*> roots; // aggregate a list of all local var ptrs & static field vals
 
@@ -552,18 +591,28 @@ namespace ULR::Resolver
 		last_gc_result = result;
 
 		gc_lock.unlock();
+		alloc_lock.unlock();
+
+		for (auto& thread : gc_lclsearch_addrs) // restart all other threads
+		{
+			if (thread.first == GetCurrentThreadId()) continue; // our thread is already running!
+
+			HANDLE thread_handle = OpenThread(THREAD_SUSPEND_RESUME, false, thread.first);
+			
+			ResumeThread(thread_handle);
+		}
 
 		return result;
 	}
 
-	void ULRAPIImpl::InitGCLocalVarRoot(char** stackaddr, std::thread::id id)
+	void ULRAPIImpl::InitGCLocalVarRoot(char** stackaddr)
 	{
-		gc_lclsearch_addrs[id].first = stackaddr;
+		gc_lclsearch_addrs[GetCurrentThreadId()].first = stackaddr;
 	}
 
-	void ULRAPIImpl::InitGCLocalVarEnd(char** stackaddr, std::thread::id id)
+	void ULRAPIImpl::InitGCLocalVarEnd(char** stackaddr)
 	{
-		gc_lclsearch_addrs[id].second = stackaddr;
+		gc_lclsearch_addrs[GetCurrentThreadId()].second = stackaddr;
 	}
 
 	Assembly* ULRAPIImpl::ResolveAddressToAssembly(void* addr)

@@ -8,6 +8,7 @@
 
 #pragma once
 
+#define GC_TRIGGERED_EXC_CODE 0xC001F00D
 
 namespace ULR::Resolver
 {
@@ -36,9 +37,10 @@ namespace ULR::Resolver
 
 		size_t prev_size_accessible = 0;
 
-		std::map<std::thread::id, std::pair<char**, char**>> gc_lclsearch_addrs;
+		std::map<pthread_t, std::pair<char**, char**>> gc_lclsearch_addrs;
 
 		std::mutex gc_lock;
+		std::mutex alloc_lock;
 
 		public:
 			GCResult last_gc_result;
@@ -97,8 +99,8 @@ namespace ULR::Resolver
 			std::set<char*> ExamineRoot(char* root);
 			std::set<char*> ExamineRoots(std::set<char*> roots);
 			GCResult Collect();
-			void InitGCLocalVarRoot(char** stackaddr, std::thread::id id);
-			void InitGCLocalVarEnd(char** stackaddr, std::thread::id id);
+			void InitGCLocalVarRoot(char** stackaddr);
+			void InitGCLocalVarEnd(char** stackaddr);
 
 			template <typename ValueType>
 			char* Box(ValueType& obj, Type* typeptr)
