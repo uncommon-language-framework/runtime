@@ -381,7 +381,7 @@ namespace ULR::Resolver
 
 		if (size > MAX_OBJECT_SIZE)
 		{
-			gc_lock.unlock();
+			alloc_lock.unlock();
 			return nullptr; // TODO: have this throw a ULR exc
 		}
 
@@ -490,7 +490,7 @@ namespace ULR::Resolver
 	GCResult ULRAPIImpl::Collect()
 	{
 		if (!gc_lock.try_lock()) // another thread is already GCing, just exit
-			return;
+			return { 0, 0 };
 
 		alloc_lock.lock(); // do not allow any allocation during collection
 
@@ -520,9 +520,10 @@ namespace ULR::Resolver
 
 		for (auto& entry : gc_lclsearch_addrs) // search locals for all threads
 		{
-			char** gc_lclsearch_end = entry.second.first;
-			char** gc_lclsearch_begin = entry.second.second; // TODO: fix (we don't know if a thread will have an endval when GC starts up)
-			
+			char** gc_lclsearch_begin = entry.second.first;
+			char** gc_lclsearch_end = entry.second.second;
+
+			// we have to start from the "end" and go to the beginning because the stack grows downward (the end is the smallest address)
 			for (char** addr = gc_lclsearch_end; addr < gc_lclsearch_begin; addr++)
 			{
 				/*
@@ -572,12 +573,11 @@ namespace ULR::Resolver
 				result.size_collected+=entry.second;
 
 				Type* objtype = GetTypeOf(alloced);
-
+				
 				// call destructor before destroying obj
 				DestructorInfo* dtor = GetDtor(objtype);
 				if (dtor) dtor->Invoke(alloced); // only call dtor if it exists
 				
-
 				free(alloced);
 
 				allocated_objs.erase(alloced);
