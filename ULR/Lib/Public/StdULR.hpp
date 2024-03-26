@@ -30,7 +30,7 @@ using sizeof_ns1_System_Boolean = bool;
 // Define a macro for boxing imitation without dynamic allocation
 
 #define ULR_USE_STACKBOX() char* _ulr_stackbox_tmp
-#define ULR_STACKBOX(obj, typeptr) ULR_STACKBOXED_VALUE = (char*) alloca(sizeof(typeptr)+sizeof(typeptr->size)); *((Type**) ULR_STACKBOXED_VALUE) = typeptr; memcpy(ULR_STACKBOXED_VALUE+sizeof(typeptr), &obj, typeptr->size)
+#define ULR_STACKBOX(obj, typeptr) ULR_STACKBOXED_VALUE = (char*) alloca(sizeof(typeptr)+typeptr->size); *((Type**) ULR_STACKBOXED_VALUE) = typeptr; memcpy(ULR_STACKBOXED_VALUE+sizeof(typeptr), &obj, typeptr->size)
 #define ULR_STACKBOXED_VALUE _ulr_stackbox_tmp
 
 // End StackBox macro

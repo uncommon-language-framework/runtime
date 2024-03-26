@@ -1,7 +1,3 @@
-- make `ulrlocals` work with multithreading
-	- do this by making a vector of `ulrlocals` arrs for each thread
-	- when threads are created they will add their ulrlocals to the vector
-	- impl the GC side logic for this (gc also needs to be able to look through threads)
 - add arg passing in MethodInvoke where the first four args are also placed on the stack (find if this is required first)
 - finish ConstructorInfo::Invoke method (should just be like methodinfo but with self as first arg and returning nothing)
 - add methodinvoke for non win64 systems
