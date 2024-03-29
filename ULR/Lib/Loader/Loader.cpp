@@ -54,7 +54,13 @@ namespace ULR::Loader
 
 		size_t deps_i = 0;
 
-		while (deps[deps_i] != nullptr) ReadAssembly(deps[deps_i]); // load deps
+		while (deps[deps_i] != nullptr) // load deps
+		{
+			// don't double-load
+			if (LoadedAssemblies.count(deps[deps_i]) || ReadAssemblies.count(deps[deps_i])) continue;
+
+			ReadAssembly(deps[deps_i]);
+		}
 
 		size_t i = 0;
 

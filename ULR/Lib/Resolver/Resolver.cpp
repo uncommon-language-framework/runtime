@@ -2,6 +2,7 @@
 #include <dbghelp.h>
 #include <winternl.h>
 #include <sstream>
+#include <llvm/Support/TargetSelect.h>
 
 #define COLOR_INTEGER "\u001b[1m" // bold actually
 #define COLOR_TYPE_GREEN "\u001b[92m"
@@ -32,6 +33,8 @@ namespace ULR::Resolver
 		this->LoadAssemblyPtr = LoadAssembly;
 		this->ReadAssemblyPtr = ReadAssembly;
 		this->PopulateVtablePtr = PopulateVtable;
+
+		llvm::InitializeNativeTarget();
 
 		this->jit = llvm::cantFail(llvm::orc::LLJITBuilder().create());
 	}
@@ -87,11 +90,17 @@ namespace ULR::Resolver
 
 	std::vector<MemberInfo*> ULRAPIImpl::GetMember(Type* type, char name[])
 	{
-		std::vector<MemberInfo*> matches = type->static_attrs[name];
+		std::vector<MemberInfo*> matches;
 
-		for (auto& to_add : type->inst_attrs[name])
+		if (type->static_attrs.count(name))
+			matches.insert(matches.begin(), type->static_attrs[name].begin(), type->static_attrs[name].end());
+
+		if (type->inst_attrs.count(name))
 		{
-			matches.emplace_back(to_add);
+			for (auto& to_add : type->inst_attrs[name])
+			{
+				matches.emplace_back(to_add);
+			}
 		}
 
 		if ((matches.size() == 0) && type->immediate_base) return GetMember(type->immediate_base, name);
@@ -101,7 +110,7 @@ namespace ULR::Resolver
 
 	ConstructorInfo* ULRAPIImpl::GetCtor(Type* type, std::vector<Type*> signature)
 	{
-		std::vector<MemberInfo*> ctors = type->static_attrs[".ctor"];
+		std::vector<MemberInfo*> ctors = type->static_attrs[".ctor"]; // types will always have a default ctor (even if they are static!!!) so there is no need to worry about accidentally creating an empty vector here
 
 		for (auto& ctor : ctors)
 		{
@@ -115,7 +124,7 @@ namespace ULR::Resolver
 
 	MethodInfo* ULRAPIImpl::GetMethod(Type* type, char name[], std::vector<Type*> argsignature, int bindingflags)
 	{
-		if (bindingflags & BindingFlags::Instance)
+		if ((bindingflags & BindingFlags::Instance) && (type->inst_attrs.count(name)))
 		{
 			for (auto& member : type->inst_attrs[name])
 			{
@@ -135,7 +144,7 @@ namespace ULR::Resolver
 			}
 		}
 
-		if (bindingflags & BindingFlags::Static)
+		if ((bindingflags & BindingFlags::Static) && (type->static_attrs.count(name)))
 		{
 			for (auto& member : type->static_attrs[name])
 			{
@@ -162,7 +171,7 @@ namespace ULR::Resolver
 
 	MethodInfo* ULRAPIImpl::GetNonNewMethod(Type* type, char name[], std::vector<Type*> argsignature, int bindingflags)
 	{
-		if (bindingflags & BindingFlags::Instance)
+		if ((bindingflags & BindingFlags::Instance) && (type->inst_attrs.count(name)))
 		{
 			for (auto& member : type->inst_attrs[name])
 			{
@@ -184,7 +193,7 @@ namespace ULR::Resolver
 			}
 		}
 
-		if (bindingflags & BindingFlags::Static)
+		if ((bindingflags & BindingFlags::Static) && (type->static_attrs.count(name)))
 		{
 			for (auto& member : type->static_attrs[name])
 			{
@@ -213,7 +222,7 @@ namespace ULR::Resolver
 
 	FieldInfo* ULRAPIImpl::GetField(Type* type, char name[], int bindingflags)
 	{
-		if (bindingflags & BindingFlags::Instance)
+		if ((bindingflags & BindingFlags::Instance) && (type->inst_attrs.count(name)))
 		{
 			for (auto& member : type->inst_attrs[name])
 			{
@@ -225,7 +234,7 @@ namespace ULR::Resolver
 			}
 		}
 
-		if (bindingflags & BindingFlags::Static)
+		if ((bindingflags & BindingFlags::Static) && (type->static_attrs.count(name)))
 		{
 			for (auto& member : type->static_attrs[name])
 			{
@@ -244,7 +253,7 @@ namespace ULR::Resolver
 
 	PropertyInfo* ULRAPIImpl::GetProperty(Type* type, char name[], int bindingflags)
 	{
-		if (bindingflags & BindingFlags::Instance)
+		if ((bindingflags & BindingFlags::Instance) && (type->inst_attrs.count(name)))
 		{
 			for (auto& member : type->inst_attrs[name])
 			{
@@ -256,7 +265,7 @@ namespace ULR::Resolver
 			}
 		}
 
-		if (bindingflags & BindingFlags::Static)
+		if ((bindingflags & BindingFlags::Static) && (type->static_attrs.count(name)))
 		{
 			for (auto& member : type->static_attrs[name])
 			{
@@ -275,11 +284,10 @@ namespace ULR::Resolver
 
 	DestructorInfo* ULRAPIImpl::GetDtor(Type* type)
 	{
-		std::vector<MemberInfo*> dtors = type->static_attrs[".dtor"];
+		if (!type->static_attrs.count(".dtor")) return nullptr;
 
-		if (dtors.size() == 0) return nullptr;
+		return (DestructorInfo*) (type->static_attrs[".dtor"][0]);
 
-		return (DestructorInfo*) dtors[0];
 	}
 
 	Type* ULRAPIImpl::GetArrayTypePrimarily(char full_qual_typename[])

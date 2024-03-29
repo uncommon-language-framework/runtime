@@ -18,7 +18,7 @@ using llvm::orc::ThreadSafeModule;
 using llvm::orc::LLJITBuilder;
 using llvm::orc::LLJIT;
 
-extern ULR::Resolver::ULRAPIImpl* internal_api = nullptr;
+extern ULR::Resolver::ULRAPIImpl* internal_api;
 
 
 namespace ULR
@@ -89,7 +89,6 @@ namespace ULR
 	}
 
 	// TODO: Resolve Generics that are nested (e.g. if a method in GenericClass<T> takes a List<T> as an argument)
-
 	// TODO: Reduce string and LLJIT allocations
 	void TransformGenericIntoApplied(std::vector<MemberInfo*>& infos, std::vector<Type*>& type_args, size_t& prev_field_offset)
 	{
@@ -395,6 +394,8 @@ namespace ULR
 		{	// see comment above for static_attrs
 			TransformGenericIntoApplied(new_type->inst_attrs[entry.first], type_args, prev_field_offset);
 		}
+
+		new_type->size = prev_field_offset;
 
 		new_type->assembly->types[new_type->name] = new_type;
 

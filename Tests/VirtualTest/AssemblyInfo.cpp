@@ -5,9 +5,9 @@
 
 BEGIN_ULR_EXPORT
 
-void overload0_ns0_Derived_ctor(char* self);
-sizeof_ns1_System_Int32 overload0_ns0_Program_Method();
-sizeof_ns1_System_Int32 overload0_ns0_Derived_Method();
+void overload0_ns0_Derived_ctor(char*);
+sizeof_ns1_System_Int32 overload0_ns0_Program_Method(char*);
+sizeof_ns1_System_Int32 overload0_ns0_Derived_Method(char*);
 
 void InitAssembly(ULRAPIImpl* ulr)
 {
@@ -31,11 +31,11 @@ sizeof_ns1_System_Int32 overload0_ns0_Program_Main(char* argv)
 
 	TEST(vtable, 2);
 
-	sizeof_ns1_System_Int32 (*method)() = (sizeof_ns1_System_Int32 (*)()) vtable[0];
+	sizeof_ns1_System_Int32 (*method)(char*) = (sizeof_ns1_System_Int32 (*)(char*)) vtable[2]; // vtable index is 2 since 0 and 1 are taken by Object.ToString() and Object.GetType()
 
 	TEST(method == overload0_ns0_Derived_Method, 3);
 
-	sizeof_ns1_System_Int32 res = method();
+	sizeof_ns1_System_Int32 res = method(derived);
 
 	TEST(res == 77, 5);
 
@@ -49,18 +49,18 @@ sizeof_ns1_System_Int32 overload0_ns0_Program_Main(char* argv)
 
 	TEST(basevtable, 6);
 
-	sizeof_ns1_System_Int32 (*basemethod)() = (sizeof_ns1_System_Int32 (*)()) basevtable[0];
+	sizeof_ns1_System_Int32 (*basemethod)(char*) = (sizeof_ns1_System_Int32 (*)(char*)) basevtable[2];
 
 	TEST(basemethod == overload0_ns0_Program_Method, 7);
 
-	sizeof_ns1_System_Int32 baseres = basemethod();
+	sizeof_ns1_System_Int32 baseres = basemethod(derived);
 
 	TEST(baseres == 23, 9);
 
 	return 0;
 }
 
-sizeof_ns1_System_Int32 overload0_ns0_Program_Method()
+sizeof_ns1_System_Int32 overload0_ns0_Program_Method(char* self)
 {
 	TEST(true, 8);
 
@@ -72,7 +72,7 @@ void overload0_ns0_Derived_ctor(char* self)
 	overload0_ns0_Program_ctor(self);
 }
 
-sizeof_ns1_System_Int32 overload0_ns0_Derived_Method()
+sizeof_ns1_System_Int32 overload0_ns0_Derived_Method(char* self)
 {
 	TEST(true, 4);
 

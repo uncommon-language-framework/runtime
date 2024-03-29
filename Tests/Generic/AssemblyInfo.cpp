@@ -17,7 +17,7 @@ sizeof_ns1_System_Int32 overload0_ns0_Program_Main(char* argv)
 	
 }
 
-char ulrmeta[] = "pc[]Program:[System]Object,$8;.ctor p();.entr s[System]Int32 Main([System]String[]);\n";
+char ulrmeta[] = "pc[]Program<>:[System]Object,$8;.ctor p();.entr s[System]Int32 Main([System]String[]);\n";
 
 void* ulraddr[] = {
 	(void*) overload0_ns0_Program_ctor,
