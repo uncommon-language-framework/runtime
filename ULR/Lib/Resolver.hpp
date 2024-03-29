@@ -5,6 +5,7 @@
 #include <set>
 #include <thread>
 #include <mutex>
+#include <llvm/ExecutionEngine/Orc/LLJIT.h>
 
 #pragma once
 
@@ -34,6 +35,7 @@ namespace ULR::Resolver
 		std::map<char*, Assembly*, cmp_chr_ptr>* read_assemblies;
 		Assembly* (*LoadAssemblyPtr)(char name[], ULRAPIImpl* api);
 		HMODULE (*ReadAssemblyPtr)(char name[]);
+		void (*PopulateVtablePtr)(Type* type);
 
 		size_t prev_size_accessible = 0;
 
@@ -46,12 +48,15 @@ namespace ULR::Resolver
 			GCResult last_gc_result;
 			std::map<char*, size_t> allocated_objs;
 			size_t allocated_size = 0;
+			std::unique_ptr<llvm::orc::LLJIT> jit;
+			std::vector<void*> allocated_field_offsets;
 
 			ULRAPIImpl(
 				std::map<char*, Assembly*, cmp_chr_ptr>* assemblies,
 				std::map<char*, Assembly*, cmp_chr_ptr>* read_assemblies,
 				HMODULE (*ReadAssembly)(char name[]),
-				Assembly* (*LoadAssembly)(char name[], ULRAPIImpl* api)
+				Assembly* (*LoadAssembly)(char name[], ULRAPIImpl* api),
+				void (*PopulateVtable)(Type* type)
 			);
 
 			bool EnsureLoaded(char assembly_name[]);
@@ -69,6 +74,7 @@ namespace ULR::Resolver
 			FieldInfo* GetField(Type* type, char name[], int bindingflags);
 			PropertyInfo* GetProperty(Type* type, char name[], int bindingflags);
 			
+			Type* GetArrayTypePrimarily(char full_qual_typename[]);
 			Type* GetType(char full_qual_typename[]);
 			Type* GetType(char full_qual_typename[], char assembly_hint[]);
 			inline Type* GetTypeOf(char* obj) { return *reinterpret_cast<Type**>(obj); } // special inline decl because this is a highly used small API function (for vcalls, so it has to be fast)
@@ -77,6 +83,8 @@ namespace ULR::Resolver
 			char* AllocateZeroed(size_t size);
 			char* AllocateObjectNoGC(size_t size);
 			char* AllocateZeroedNoGC(size_t size);
+
+			void* AllocateFieldOffset(size_t size);
 			
 			template <typename... Args>
 				char* ConstructObject(

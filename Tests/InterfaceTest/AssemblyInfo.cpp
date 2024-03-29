@@ -61,4 +61,6 @@ void* ulraddr[] = {
 	nullptr
 };
 
+char* ulrdeps[] = { nullptr };
+
 END_ULR_EXPORT

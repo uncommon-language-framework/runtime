@@ -65,4 +65,6 @@ void* ulraddr[] = {
 	(void*) overload0_ns0_Derived_ctor
 };
 
+char* ulrdeps[] = { nullptr };
+
 END_ULR_EXPORT

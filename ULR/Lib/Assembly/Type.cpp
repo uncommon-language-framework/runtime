@@ -1,4 +1,5 @@
 #include "../Assembly.hpp"
+#include "../Resolver.hpp"
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IRReader/IRReader.h>
 #include <llvm/Support/SourceMgr.h>
@@ -16,6 +17,9 @@ using llvm::orc::ThreadSafeContext;
 using llvm::orc::ThreadSafeModule;
 using llvm::orc::LLJITBuilder;
 using llvm::orc::LLJIT;
+
+extern ULR::Resolver::ULRAPIImpl* internal_api = nullptr;
+
 
 namespace ULR
 {
@@ -87,16 +91,20 @@ namespace ULR
 	// TODO: Resolve Generics that are nested (e.g. if a method in GenericClass<T> takes a List<T> as an argument)
 
 	// TODO: Reduce string and LLJIT allocations
-	void TransformGenericIntoApplied(std::vector<MemberInfo*>& infos, std::vector<Type*>& type_args)
+	void TransformGenericIntoApplied(std::vector<MemberInfo*>& infos, std::vector<Type*>& type_args, size_t& prev_field_offset)
 	{
 		// NOTE: must create copies of all of the MemberInfo objects in infos and replace them in infos (which is a ref so it should update the new type's table)
 		for (auto& info : infos)
 		{
+			if (!info) continue;
+
 			info->is_empty_generic = false;
 
 			if (info->decl_type == MemberType::Method)
 			{
 				MethodInfo* new_info = new MethodInfo(*((MethodInfo*) info));
+
+				delete info; // delete old info
 
 				for (auto& arg : new_info->argsig)
 				{
@@ -148,17 +156,17 @@ namespace ULR
 					exit(1);
 				}
 
-				std::unique_ptr<LLJIT> jit = llvm::cantFail(LLJITBuilder().create());
-
 				ThreadSafeModule thread_safe_mod = ThreadSafeModule(std::move(mod), ThreadSafeContext(std::move(ctx)));
 
-				llvm::cantFail(jit->addIRModule(std::move(thread_safe_mod)));
+				llvm::cantFail(internal_api->jit->addIRModule(std::move(thread_safe_mod)));
 
-				auto func = llvm::cantFail(jit->lookup("ulr_generic_load"));
+				auto func = llvm::cantFail(internal_api->jit->lookup("ulr_generic_load"));
 
 				void* addr = func.toPtr<void*>();
 
 				new_info->offset = addr;
+
+				delete info; // delete old info
 
 				info = new_info;
 
@@ -168,6 +176,8 @@ namespace ULR
 			if (info->decl_type == MemberType::Ctor)
 			{
 				ConstructorInfo* new_info = new ConstructorInfo(*((ConstructorInfo*) info));
+
+				delete info; // delete old info
 
 				for (auto& arg : new_info->signature)
 				{
@@ -212,17 +222,17 @@ namespace ULR
 					exit(1);
 				}
 
-				std::unique_ptr<LLJIT> jit = llvm::cantFail(LLJITBuilder().create());
-
 				ThreadSafeModule thread_safe_mod = ThreadSafeModule(std::move(mod), ThreadSafeContext(std::move(ctx)));
 
-				llvm::cantFail(jit->addIRModule(std::move(thread_safe_mod)));
+				llvm::cantFail(internal_api->jit->addIRModule(std::move(thread_safe_mod)));
 
-				auto func = llvm::cantFail(jit->lookup("ulr_generic_load"));
+				auto func = llvm::cantFail(internal_api->jit->lookup("ulr_generic_load"));
 
 				void* addr = func.toPtr<void*>();
 
 				new_info->offset = addr;
+
+				delete info; // delete old info
 
 				info = new_info;
 
@@ -232,6 +242,8 @@ namespace ULR
 			if (info->decl_type == MemberType::Dtor)
 			{
 				DestructorInfo* new_info = new DestructorInfo(*((DestructorInfo*) info));
+
+				delete info; // delete old info
 
 				std::string alloced_llir_code(new_info->generic_llir);
 
@@ -266,30 +278,80 @@ namespace ULR
 					exit(1);
 				}
 
-				std::unique_ptr<LLJIT> jit = llvm::cantFail(LLJITBuilder().create());
-
 				ThreadSafeModule thread_safe_mod = ThreadSafeModule(std::move(mod), ThreadSafeContext(std::move(ctx)));
 
-				llvm::cantFail(jit->addIRModule(std::move(thread_safe_mod)));
+				llvm::cantFail(internal_api->jit->addIRModule(std::move(thread_safe_mod)));
 
-				auto func = llvm::cantFail(jit->lookup("ulr_generic_load"));
+				auto func = llvm::cantFail(internal_api->jit->lookup("ulr_generic_load"));
 
 				void* addr = func.toPtr<void*>();
 
 				new_info->offset = addr;
 
 				info = new_info;
+
+				return; // there can rever be an overloaded dtor
 			}
 
-			if (info->decl_type == MemberType::Field)
+			if (info->decl_type == MemberType::Field) // TODO: we need static generic initialization functions to set default field vals
 			{
 				FieldInfo* new_info = new FieldInfo(*((FieldInfo*) info));
+				
+				delete info; // delete old info				
+
+				if (new_info->is_static)
+				{
+					if (IsBoxableStruct(new_info->valtype))
+					{
+						new_info->offset = internal_api->AllocateFieldOffset(
+							new_info->valtype->size
+						);
+					}
+					else
+					{
+						new_info->offset = internal_api->AllocateFieldOffset(
+							sizeof(void*)
+						);
+					}
+				}
+				else
+				{
+					// need to calc offset somehow
+					new_info->offset = (void*) prev_field_offset;
+
+					if (new_info->valtype->IsGenericPlaceholder())
+					{
+						new_info->valtype = type_args[((GenericPlaceholder*) new_info->valtype)->num];
+					}
+
+					if (IsBoxableStruct(new_info->valtype))
+					{
+						prev_field_offset+=new_info->valtype->size;
+					}
+					else
+					{
+						prev_field_offset+=sizeof(void*);
+					}
+				}
+
+				return; // there can rever be an overloaded field
 			}
 
 			if (info->decl_type == MemberType::Property)
 			{
 				PropertyInfo* new_info = new PropertyInfo(*((PropertyInfo*) info));
 				
+				delete info; // delete old info				
+				
+				// TODO: need a null check on getter/setter
+				std::vector<MemberInfo*> methods { new_info->getter, new_info->setter };
+
+				TransformGenericIntoApplied(methods, type_args, prev_field_offset);
+
+				new_info->getter = (MethodInfo*) methods[0];
+				new_info->setter = (MethodInfo*) methods[1];
+
+				return; // there can rever be an overloaded property
 			}
 		}
 	}
@@ -303,13 +365,15 @@ namespace ULR
 		new_type->is_empty_generic = false;
 		new_type->is_generic_construction = true;
 
+		size_t prev_field_offset = sizeof(Type*);
+
 		for (auto& entry : new_type->static_attrs)
 		{	// don't use entry.second as this will yield a copy, we want to modify new_type->static_attrs' refs
-			TransformGenericIntoApplied(new_type->static_attrs[entry.first], type_args);
+			TransformGenericIntoApplied(new_type->static_attrs[entry.first], type_args, prev_field_offset);
 		}
 		for (auto& entry : new_type->inst_attrs)
 		{	// see comment above for static_attrs
-			TransformGenericIntoApplied(new_type->inst_attrs[entry.first], type_args);
+			TransformGenericIntoApplied(new_type->inst_attrs[entry.first], type_args, prev_field_offset);
 		}
 
 		return new_type;

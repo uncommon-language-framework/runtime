@@ -57,13 +57,14 @@ int main(int argc, char* argv[])
 		&Loader::LoadedAssemblies,
 		&Loader::ReadAssemblies,
 		Loader::ReadAssembly,
-		Loader::LoadAssembly
+		Loader::LoadAssembly,
+		Loader::PopulateVtable
 	);
 	/* Initialize Internal Library */
 
 	internal_api = &lclapi;
 
-	Assembly* ArrayTypeAssembly = new Assembly(strdup("ULR.<ArrayTypes>"), "", 0, nullptr, nullptr, nullptr, 0, nullptr, (HMODULE) nullptr);
+	Assembly* ArrayTypeAssembly = new Assembly(strdup("ULR.<ArrayTypes>"), "", 0, { }, { nullptr }, (HMODULE) nullptr);
 	Loader::LoadedAssemblies[ArrayTypeAssembly->name] = ArrayTypeAssembly;
 	
 	/* Load Stdlib*/
@@ -143,6 +144,11 @@ int main(int argc, char* argv[])
 	}
 
 	lclapi.allocated_size = 0;
+
+	for (void* ptr : lclapi.allocated_field_offsets)
+	{
+		free(ptr);
+	}
 
 	std::set<Assembly*> allocated_asms;
 

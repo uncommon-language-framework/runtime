@@ -23,13 +23,17 @@ namespace ULR::Resolver
 		std::map<char*, Assembly*, cmp_chr_ptr>* assemblies,
 		std::map<char*, Assembly*, cmp_chr_ptr>* read_assemblies,
 		HMODULE (*ReadAssembly)(char name[]),
-		Assembly* (*LoadAssembly)(char name[], ULRAPIImpl* api)
+		Assembly* (*LoadAssembly)(char name[], ULRAPIImpl* api),
+		void (*PopulateVtable)(Type* type)
 	)
 	{
 		this->assemblies = assemblies;
 		this->read_assemblies = read_assemblies;
 		this->LoadAssemblyPtr = LoadAssembly;
 		this->ReadAssemblyPtr = ReadAssembly;
+		this->PopulateVtablePtr = PopulateVtable;
+
+		this->jit = llvm::cantFail(llvm::orc::LLJITBuilder().create());
 	}
 
 	// returns true if the assembly is successfully loaded. returns false if the assembly was not read yet (and therefore cannot be loaded). If the assembly was read but not loaded, this function loads the assembly fully and returns true
@@ -278,6 +282,33 @@ namespace ULR::Resolver
 		return (DestructorInfo*) dtors[0];
 	}
 
+	Type* ULRAPIImpl::GetArrayTypePrimarily(char full_qual_typename[])
+	{
+		Type* tryfind = GetType(full_qual_typename, "ULR.<ArrayTypes>");
+
+		if (tryfind) return tryfind;
+
+		// if array type that is not already found, create it
+		size_t len = strlen(full_qual_typename);
+
+		if (full_qual_typename[len-2] == '[' && full_qual_typename[len-1] == ']') // array type (ends with [])
+		{			
+			Assembly* ArrayTypeAssembly = (*assemblies)["ULR.<ArrayTypes>"];
+			
+			Type* elem_type = GetArrayTypePrimarily(const_cast<char*>(std::string(full_qual_typename, len-2).c_str())); // get inner element type (if it is a nested array, recursion will provide us the proper type)
+
+			Type* array_type = new Type(TypeType::ArrayType, ArrayTypeAssembly, strdup(full_qual_typename), Modifiers::Public | Modifiers::Sealed, 0, { }, GetType("[System]Object"), elem_type);
+
+			PopulateVtablePtr(array_type);
+
+			ArrayTypeAssembly->types[array_type->name] = array_type; // use array_type->name because it is guaranteed to be dynamically allocated and last as long as array_type lasts
+
+			return array_type;
+		}
+
+		return GetType(full_qual_typename); // it was not an array type
+	}
+
 	// }
 	Type* ULRAPIImpl::GetType(char full_qual_typename[])
 	{
@@ -298,18 +329,37 @@ namespace ULR::Resolver
 			if (entry.second->types.count(full_qual_typename) != 0) return entry.second->types[full_qual_typename];
 		}
 
-		throw /* new TypeNotFound exc */;
+
+		// if array type that is not already found, create it
+		size_t len = strlen(full_qual_typename);
+
+		if (full_qual_typename[len-2] == '[' && full_qual_typename[len-1] == ']') // array type (ends with [])
+		{			
+			Assembly* ArrayTypeAssembly = (*assemblies)["ULR.<ArrayTypes>"];
+			
+			Type* elem_type = GetArrayTypePrimarily(const_cast<char*>(std::string(full_qual_typename, len-2).c_str())); // get inner element type (if it is a nested array, recursion will provide us the proper type)
+
+			Type* array_type = new Type(TypeType::ArrayType, ArrayTypeAssembly, strdup(full_qual_typename), Modifiers::Public | Modifiers::Sealed, 0, { }, GetType("[System]Object"), elem_type);
+
+			PopulateVtablePtr(array_type);
+
+			ArrayTypeAssembly->types[array_type->name] = array_type; // use array_type->name because it is guaranteed to be dynamically allocated and last as long as array_type lasts
+
+			return array_type;
+		}
+
+		return nullptr;
 	}
 
 	Type* ULRAPIImpl::GetType(char full_qual_typename[], char assembly_hint[])
 	{
-		if (read_assemblies->count(assembly_hint) == 0 && assemblies->count(assembly_hint)) throw std::runtime_error("first fault") /* new TypeNotFound exc */;
+		if (read_assemblies->count(assembly_hint) == 0 && assemblies->count(assembly_hint)) return nullptr;
 
 		auto& assembly = (*assemblies)[assembly_hint];
 		
 		if (assembly->types.count(full_qual_typename) != 0) return assembly->types[full_qual_typename];
 
-		throw std::runtime_error("second fault") /* new TypeNotFound exc */;
+		return nullptr;
 	}
 	
 	char* ULRAPIImpl::AllocateObject(size_t size)
@@ -394,6 +444,15 @@ namespace ULR::Resolver
 		alloc_lock.unlock();
 		
 		return mem;
+	}
+
+	void* ULRAPIImpl::AllocateFieldOffset(size_t size)
+	{
+		void* alloced = malloc(size);
+
+		allocated_field_offsets.emplace_back(alloced);
+
+		return alloced;
 	}
 
 	std::set<char*> ULRAPIImpl::ExamineRoot(char* root)

@@ -25,6 +25,8 @@ void* ulraddr[] = {
 	(void*) overload0_ns0_Program_Main
 };
 
+char* ulrdeps[] = { nullptr };
+
 END_ULR_EXPORT
 "@
 $script_code = @"

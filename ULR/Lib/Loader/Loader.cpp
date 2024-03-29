@@ -30,8 +30,9 @@ namespace ULR::Loader
 
 		char* meta = (char*) GetProcAddress(mod, "ulrmeta");
 		void** addr = (void**) GetProcAddress(mod, "ulraddr");
+		char** deps = (char**) GetProcAddress(mod, "ulrdeps");
 
-		if (meta == nullptr || addr == nullptr)
+		if (meta == nullptr || addr == nullptr || deps == nullptr)
 		{
 			std::cerr << "fatal: '"  << dll << "' is not a valid ULR Assembly";
 			exit(1);
@@ -47,12 +48,13 @@ namespace ULR::Loader
 			meta,
 			metalen,
 			addr,
-			(char**) GetProcAddress(mod, "ulrlocals"),
-			(Type**) GetProcAddress(mod, "ulrlocals_valtypeinfo"),
-			(size_t) GetProcAddress(mod, "ulrlocalslen"),
-			(size_t**) GetProcAddress(mod, "ulrlocalsmapping"),
+			deps,
 			mod
 		);
+
+		size_t deps_i = 0;
+
+		while (deps[deps_i] != nullptr) ReadAssembly(deps[deps_i]); // load deps
 
 		size_t i = 0;
 
