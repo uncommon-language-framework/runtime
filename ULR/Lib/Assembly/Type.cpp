@@ -358,12 +358,32 @@ namespace ULR
 
 	Type* Type::MakeGeneric(std::vector<Type*> type_args)
 	{
-		// TODO: GENERATE VALID METHODS AND FIELDS WITH TYPE ARGS
+		std::string new_name = this->name;
+
+		new_name.push_back('<');
+
+		for (auto arg : type_args)
+		{
+			new_name.append(arg->name);
+			new_name.push_back(',');
+		}
+
+		new_name.pop_back();
+		new_name.push_back('>');
+
+		// if the type is already created, don't recreate it
+		if (this->assembly->types.count(const_cast<char*>(new_name.c_str())))
+			return this->assembly->types[const_cast<char*>(new_name.c_str())];
+
 		Type* new_type = new Type(*this);
 
 		new_type->type_args = type_args;
 		new_type->is_empty_generic = false;
 		new_type->is_generic_construction = true;
+
+		new_type->name = strdup(
+			new_name.c_str()
+		);
 
 		size_t prev_field_offset = sizeof(Type*);
 
@@ -375,6 +395,8 @@ namespace ULR
 		{	// see comment above for static_attrs
 			TransformGenericIntoApplied(new_type->inst_attrs[entry.first], type_args, prev_field_offset);
 		}
+
+		new_type->assembly->types[new_type->name] = new_type;
 
 		return new_type;
 	}
