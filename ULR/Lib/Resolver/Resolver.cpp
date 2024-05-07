@@ -25,7 +25,8 @@ namespace ULR::Resolver
 		std::map<char*, Assembly*, cmp_chr_ptr>* read_assemblies,
 		HMODULE (*ReadAssembly)(char name[]),
 		Assembly* (*LoadAssembly)(char name[], ULRAPIImpl* api),
-		void (*PopulateVtable)(Type* type)
+		void (*PopulateVtable)(Type* type),
+		HMODULE debugger
 	)
 	{
 		this->assemblies = assemblies;
@@ -37,6 +38,21 @@ namespace ULR::Resolver
 		llvm::InitializeNativeTarget();
 
 		this->jit = llvm::cantFail(llvm::orc::LLJITBuilder().create());
+
+		if (debugger)
+		{
+			void (*InitDebugger)(ULRAPIImpl*) = (void (*)(ULRAPIImpl*)) GetProcAddress(debugger, "InitDebugger");
+
+			if (!InitDebugger)
+			{
+				std::cerr << "Failed to load debugger!\n";
+				exit(1);
+			}
+
+			InitDebugger(this);
+
+			StaticDebug = (void (*)(StaticDebugInfo&)) GetProcAddress(debugger, "StaticDebug");
+		}
 	}
 
 	// returns true if the assembly is successfully loaded. returns false if the assembly was not read yet (and therefore cannot be loaded). If the assembly was read but not loaded, this function loads the assembly fully and returns true
@@ -343,17 +359,7 @@ namespace ULR::Resolver
 
 		if (full_qual_typename[len-2] == '[' && full_qual_typename[len-1] == ']') // array type (ends with [])
 		{			
-			Assembly* ArrayTypeAssembly = (*assemblies)["ULR.<ArrayTypes>"];
-			
-			Type* elem_type = GetArrayTypePrimarily(const_cast<char*>(std::string(full_qual_typename, len-2).c_str())); // get inner element type (if it is a nested array, recursion will provide us the proper type)
-
-			Type* array_type = new Type(TypeType::ArrayType, ArrayTypeAssembly, strdup(full_qual_typename), Modifiers::Public | Modifiers::Sealed, 0, { }, GetType("[System]Object"), elem_type);
-
-			PopulateVtablePtr(array_type);
-
-			ArrayTypeAssembly->types[array_type->name] = array_type; // use array_type->name because it is guaranteed to be dynamically allocated and last as long as array_type lasts
-
-			return array_type;
+			return GetArrayTypePrimarily(full_qual_typename);
 		}
 
 		return nullptr;
@@ -680,6 +686,14 @@ namespace ULR::Resolver
 	void ULRAPIImpl::InitGCLocalVarEnd(char** stackaddr)
 	{
 		gc_lclsearch_addrs[GetCurrentThreadId()].second = stackaddr;
+	}
+
+	void ULRAPIImpl::Breakpoint(StaticDebugInfo info)
+	{
+		if (StaticDebug)
+		{
+			StaticDebug(info);
+		}
 	}
 
 	Assembly* ULRAPIImpl::ResolveAddressToAssembly(void* addr)

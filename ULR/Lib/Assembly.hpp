@@ -151,28 +151,30 @@ namespace ULR
 	{
 		public:
 			std::vector<Type*> argsig;
-			Type* rettype;
 			void* offset;
 			char* generic_llir;
-			
+			Type* rettype;
 			MethodInfo(char* name, bool is_static, std::vector<Type*> argsig, Type* rettype, void* offset, int attrs, bool is_generic, char* generic_llir = nullptr);
 			~MethodInfo();
 
-			char* Invoke(char* self, std::vector<char*> args); // Invoke, GetPointer, and the like have to be defined in the header so that they can be accessible by compilations
-		};
+			char* Invoke(char* self, std::vector<char*> args);
+	};
 
 	class ConstructorInfo : public MemberInfo
 	{
 		public:
-			std::vector<Type*> signature; // argsig since ctors have no rettype
+			std::vector<Type*> argsig;
 			void* offset;
 			bool is_static = true;
 			char* generic_llir;
 			
 			ConstructorInfo(std::vector<Type*> signature, void* offset, int attrs, bool is_generic, char* generic_llir = nullptr);
 
-			void Invoke(std::vector<void*> args);
+			// in the high-level API [System.Reflection]ConstructorInfo.Invoke() should return an object, here, the empty object must be passed to it as the first arg  (and the method's return value is ignored by Invoke())
+			void Invoke(char* self, std::vector<char*> args);
 	};
+
+	
 
 	class DestructorInfo : public MemberInfo
 	{

@@ -15,12 +15,6 @@
 using namespace ULR;
 using namespace ULR::Resolver;
 
-
-using std::chrono::duration;
-using precise_clock = std::chrono::steady_clock;
-
-#define get_duration_ms(duration) std::chrono::duration_cast<std::chrono::nanoseconds>(duration)
-
 char* (*special_string_MAKE_FROM_LITERAL)(char* str, int len);
 char* (*special_array_from_ptr)(void* ptr, int size, Type* type);
 
@@ -53,18 +47,28 @@ int main(int argc, char* argv[])
 {
 	std::signal(SIGSEGV, handle_access_violation);
 
+	HMODULE debugger = LoadLibraryA("../../uld/src/uld/uld.dll"); // TODO: grab from cli args
+
+	if (!debugger)
+	{
+		std::cerr << "Default Debugger not found.\n";
+		return 1;
+	}
+
 	ULRAPIImpl lclapi = ULRAPIImpl( // perhaps refactor Loader into an object someday
 		&Loader::LoadedAssemblies,
 		&Loader::ReadAssemblies,
 		Loader::ReadAssembly,
 		Loader::LoadAssembly,
-		Loader::PopulateVtable
+		Loader::PopulateVtable,
+		debugger
 	);
 	/* Initialize Internal Library */
 
 	internal_api = &lclapi;
 
 	Assembly* ArrayTypeAssembly = new Assembly(strdup("ULR.<ArrayTypes>"), "", 0, { }, { nullptr }, (HMODULE) nullptr);
+	Loader::ReadAssemblies[ArrayTypeAssembly->name] = ArrayTypeAssembly;
 	Loader::LoadedAssemblies[ArrayTypeAssembly->name] = ArrayTypeAssembly;
 	
 	/* Load Stdlib*/
@@ -113,7 +117,7 @@ int main(int argc, char* argv[])
 		void* stacktrace = StackTraceProperty->GetValue(exc);
 		void* message = MessageProperty->GetValue(exc);
 
-		// extract char from strings
+		// extract char* from strings
 
 		int stacktrace_len = *((int*) (((char*) stacktrace)+sizeof(Type*)));
 		int message_len = *((int*) (((char*) message)+sizeof(Type*)));
@@ -124,7 +128,6 @@ int main(int argc, char* argv[])
 		std::string_view stacktrace_cppstr(stacktrace_cstr, stacktrace_len);
 		std::string_view message_cppstr(message_cstr, message_len);
 
-		// does this work?
 		std::cerr
 			<< "Unhandled Exception "
 			<< lclapi.GetDisplayNameOf(SystemException)
@@ -139,7 +142,7 @@ int main(int argc, char* argv[])
 	// Final deallocation and cleanup (of ULR objects and the allocated assemblies)
 
 	for (auto& entry : lclapi.allocated_objs)
-	{
+	{		
 		free(entry.first);
 	}
 
@@ -165,6 +168,7 @@ int main(int argc, char* argv[])
 		delete placeholder;
 	}
 
+	FreeLibrary(debugger);
 	SymCleanup(GetCurrentProcess());
 
 	return retcode;

@@ -29,13 +29,20 @@ namespace ULR::Resolver
 			size_t num_collected = 0;
 	};
 
+	struct StaticDebugInfo
+	{
+		const char* source_filename;
+		unsigned int source_lineno;
+		const char* source_line;
+		unsigned int breakpoint_no;
+	};
+
 	class ULRAPIImpl
 	{
-		std::map<char*, Assembly*, cmp_chr_ptr>* assemblies;
-		std::map<char*, Assembly*, cmp_chr_ptr>* read_assemblies;
 		Assembly* (*LoadAssemblyPtr)(char name[], ULRAPIImpl* api);
 		HMODULE (*ReadAssemblyPtr)(char name[]);
 		void (*PopulateVtablePtr)(Type* type);
+		void (*StaticDebug)(StaticDebugInfo& info);
 
 		size_t prev_size_accessible = 0;
 
@@ -50,13 +57,16 @@ namespace ULR::Resolver
 			size_t allocated_size = 0;
 			std::unique_ptr<llvm::orc::LLJIT> jit;
 			std::vector<void*> allocated_field_offsets;
+			std::map<char*, Assembly*, cmp_chr_ptr>* assemblies;
+			std::map<char*, Assembly*, cmp_chr_ptr>* read_assemblies;
 
 			ULRAPIImpl(
 				std::map<char*, Assembly*, cmp_chr_ptr>* assemblies,
 				std::map<char*, Assembly*, cmp_chr_ptr>* read_assemblies,
 				HMODULE (*ReadAssembly)(char name[]),
 				Assembly* (*LoadAssembly)(char name[], ULRAPIImpl* api),
-				void (*PopulateVtable)(Type* type)
+				void (*PopulateVtable)(Type* type),
+				HMODULE debugger
 			);
 
 			bool EnsureLoaded(char assembly_name[]);
@@ -133,6 +143,8 @@ namespace ULR::Resolver
 					)
 				);
 			}
+
+			void Breakpoint(StaticDebugInfo info);
 
 			Assembly* ResolveAddressToAssembly(void* addr);
 			MemberInfo* ResolveAddressToMember(void* addr);

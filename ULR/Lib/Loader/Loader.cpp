@@ -60,6 +60,8 @@ namespace ULR::Loader
 			if (LoadedAssemblies.count(deps[deps_i]) || ReadAssemblies.count(deps[deps_i])) continue;
 
 			ReadAssembly(deps[deps_i]);
+
+			deps_i++;
 		}
 
 		size_t i = 0;

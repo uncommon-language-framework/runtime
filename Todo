@@ -1,13 +1,13 @@
 - add arg passing in MethodInvoke where the first four args are also placed on the stack (find if this is required first)
-- finish ConstructorInfo::Invoke method (should just be like methodinfo but with self as first arg and returning nothing)
 - add methodinvoke for non win64 systems
 - change some reinterpret casts in stdlib to normal casts
 - add runtime member reordering for runtime inheritance once dynamic type generation is allowed (field reordering)
 - dynamic generic type generation
+	- nested generic type generation/support
+		- for this, have the compiler create a list of static nested generics before LLIR in generic IR string
+			- have each nested generic assigned a type ident (which the compiler should have already used in its LLIR) and any appearances of `sizeof_TypeIdent` should be replaced with the size of the nested generic by the runtime
 - prebuilt generic type loading
-- array type deps loading from metadata ^
+- array type deps loading from metadata ^ - WILL NOT IMPL - array types can be created from InitAssembly
 - have loader support all valid modifiers for different attributes
-- add static ctor support - marked as will not add - decided that compilers should manage static ctors themselves
+- add static ctor support - WILL NOT IMPL - decided that compilers should manage static ctors themselves
 - remove switch case blocks in Loader that are always true or false
-- allow assemblies to specify deps & look for circular deps
-- allow ULRAPI to create array type objects (just move the loader logic to ULRAPI & have loader delegate to it)

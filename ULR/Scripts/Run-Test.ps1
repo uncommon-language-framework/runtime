@@ -1,11 +1,14 @@
-Scripts/compile "../Tests/$($args[0])" "debug"
+if ($args[1] -ne "nocompile")
+{
+	Scripts/compile "../Tests/$($args[0])" "debug"
 
-$prev = Get-Location
+	$prev = Get-Location
 
-Set-Location "../Tests/$($args[0])"
+	Set-Location "../Tests/$($args[0])"
 
-./ulfasm "debug"
+	./ulfasm "debug"
 
-Set-Location $prev
+	Set-Location $prev
+}
 
 ./ulrhost "../Tests/$($args[0])/$($args[0]).dll"
