@@ -1,0 +1,19 @@
+public class Program:
+	public static [System]Int32 Main:
+		.local [System]String[] arg
+		.local [System]Int32
+		
+		ldstr "Hello, World!"
+		call static [System]Void[System]Console.WriteLine([System]String)
+
+		ldnc i32 4
+		ldnc i32 5
+		add i32
+		stloc 1
+
+
+		ldloc 1
+		call static [System]Void[System]Console.WriteLine([System]Int32)
+
+		ldnc i32 0
+		ret

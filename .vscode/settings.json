@@ -71,6 +71,8 @@
 		"thread": "cpp",
 		"typeinfo": "cpp",
 		"variant": "cpp",
-		"iomanip": "cpp"
+		"iomanip": "cpp",
+		"*.def": "cpp",
+		"filesystem": "cpp"
 	}
 }

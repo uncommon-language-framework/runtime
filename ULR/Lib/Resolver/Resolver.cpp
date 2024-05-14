@@ -132,7 +132,7 @@ namespace ULR::Resolver
 		{
 			ConstructorInfo* casted = (ConstructorInfo*) ctor;
 
-			if (casted->signature == signature) return casted;
+			if (casted->argsig == signature) return casted;
 		}
 		
 		throw /* new NoConstructor exc*/;
@@ -846,13 +846,13 @@ namespace ULR::Resolver
 
 			base_display.push_back('(');
 
-			for (auto& arg : ((ConstructorInfo*) member)->signature)
+			for (auto& arg : ((ConstructorInfo*) member)->argsig)
 			{
 				base_display.append(GetDisplayNameOf(arg));
 				base_display.append(", ");
 			}
 
-			if (((ConstructorInfo* ) member)->signature.size() != 0) base_display.erase(base_display.size()-2);
+			if (((ConstructorInfo* ) member)->argsig.size() != 0) base_display.erase(base_display.size()-2);
 			
 			base_display.push_back(')');
 

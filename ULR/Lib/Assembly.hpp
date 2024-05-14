@@ -101,6 +101,7 @@ namespace ULR
 			std::vector<Type*> type_args;
 			
 			Type* element_type; // if the type is an array type
+			size_t element_storage_size;
 
 			void** primary_vtable; // populate this at the end of loading using reflection
 			size_t primary_vtable_len;
@@ -221,6 +222,7 @@ namespace ULR
 		public:
 			HMODULE handle;
 			char* name;
+			char* path;
 			char* meta;
 			size_t metalen;
 			void** addr;
@@ -229,7 +231,14 @@ namespace ULR
 			std::map<char*, Type*, cmp_chr_ptr> types;
 			std::unordered_map<std::string_view, void*> cached_sym_lookups;
 
-			Assembly(char* name, char* meta, size_t metalen, void** addr, char** deps, HMODULE handle);
+			Assembly(char* name, char* path, char* meta, size_t metalen, void** addr, char** deps, HMODULE handle);
 			~Assembly();
 	};
+
+	bool IsFloatingPointType(Type* typeptr)
+	{
+		std::string_view name = typeptr->name;
+
+		return (name == "[System]Float") || (name == "[System]Double");
+	}
 }

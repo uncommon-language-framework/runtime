@@ -46,6 +46,11 @@ namespace ULR
 		this->interfaces = interfaces;
 		this->immediate_base = immediate_base;
 		this->element_type = array_element_type;
+
+		if (IsBoxableStruct(element_type))
+			this->element_storage_size = element_type->size;
+		else
+			this->element_storage_size = sizeof(char*);
 	}
 
 	void Type::AddStaticMember(MemberInfo* member)
@@ -178,7 +183,7 @@ namespace ULR
 
 				delete info; // delete old info
 
-				for (auto& arg : new_info->signature)
+				for (auto& arg : new_info->argsig)
 				{
 					if (arg->IsGenericPlaceholder())
 					{

@@ -16,9 +16,9 @@ namespace ULR
 
 	void ConstructorInfo::Invoke(char* self, std::vector<char*> args)
 	{
-	/* This internal invoke method assumes correct types and length for `args`. 
-		The stdlib wrapper implementation should validate `args` and `self` this 
-		before calling this ULRAPI method. */	
+		/* This internal invoke method assumes correct types and length for `args`. 
+			The stdlib wrapper implementation should validate `args` and `self` this 
+			before calling this ULRAPI method. */	
 
 		#ifdef _WIN64
 
@@ -32,8 +32,6 @@ namespace ULR
 		size_t numargs = args.size();
 		
 		std::vector<void*> unboxedargs(numargs);
-
-		Type* rettype = lclsig[numargs];
 
 		for (size_t i = 0; i < lclsig.size()-1; i++)
 		{
@@ -82,55 +80,55 @@ namespace ULR
 
 		if (numargs > 3)
 			asm volatile(
-				"mov rcx, %1\n\t"
-				"movq xmm0, %1\n\t"
-				"mov rdx, %2\n\t"
-				"movq xmm1, %2\n\t"
-				"mov r8, %3\n\t"
-				"movq xmm2, %3\n\t"
-				"mov r9, %4\n\t"
-				"movq xmm3, %4\n\t"
-				"call %5\n\t"
+				"mov rcx, %0\n\t"
+				"movq xmm0, %0\n\t"
+				"mov rdx, %1\n\t"
+				"movq xmm1, %1\n\t"
+				"mov r8, %2\n\t"
+				"movq xmm2, %2\n\t"
+				"mov r9, %3\n\t"
+				"movq xmm3, %3\n\t"
+				"call %4\n\t"
 				:
 				:"r"(first_arg), "r"(second_arg), "r"(third_arg), "r"(fourth_arg), "r"(offset)
 				:"rax", "rcx", "rdx", "r8", "r9", "r10", "r11", "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5"
 			);
 		else if (numargs > 2)
 			asm volatile(
-				"mov rcx, %1\n\t"
-				"movq xmm0, %1\n\t"
-				"mov rdx, %2\n\t"
-				"movq xmm1, %2\n\t"
-				"mov r8, %3\n\t"
-				"movq xmm2, %3\n\t"
-				"call %4\n\t"
+				"mov rcx, %0\n\t"
+				"movq xmm0, %0\n\t"
+				"mov rdx, %1\n\t"
+				"movq xmm1, %1\n\t"
+				"mov r8, %2\n\t"
+				"movq xmm2, %2\n\t"
+				"call %3\n\t"
 				:
 				:"r"(first_arg), "r"(second_arg), "r"(third_arg), "r"(offset)
 				:"rax", "rcx", "rdx", "r8", "r9", "r10", "r11", "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5"
 			);
 		else if (numargs > 1)
 			asm volatile(
-				"mov rcx, %1\n\t"
-				"movq xmm0, %1\n\t"
-				"mov rdx, %2\n\t"
-				"movq xmm1, %2\n\t"
-				"call %3\n\t"
+				"mov rcx, %0\n\t"
+				"movq xmm0, %0\n\t"
+				"mov rdx, %1\n\t"
+				"movq xmm1, %1\n\t"
+				"call %2\n\t"
 				:
 				:"r"(first_arg), "r"(second_arg), "r"(offset)
 				:"rax", "rcx", "rdx", "r8", "r9", "r10", "r11", "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5"
 			);
 		else if (numargs > 0)
 			asm volatile(
-				"mov rcx, %1\n\t"
-				"movq xmm0, %1\n\t"
-				"call %2\n\t"
+				"mov rcx, %0\n\t"
+				"movq xmm0, %0\n\t"
+				"call %1\n\t"
 				:
 				:"r"(first_arg), "r"(offset)
 				:"rax", "rcx", "rdx", "r8", "r9", "r10", "r11", "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5"
 			);
 		else
 			asm volatile(
-				"call %1\n\t"
+				"call %0\n\t"
 				:
 				:"r"(offset)
 				:"rax", "rcx", "rdx", "r8", "r9", "r10", "r11", "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5"

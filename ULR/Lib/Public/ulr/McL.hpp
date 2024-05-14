@@ -1,5 +1,7 @@
 #include "StdULR.hpp"
 
+#pragma once
+
 /*
 	ULR McL Macro Language
 			- -   -
@@ -33,3 +35,4 @@
 	```
 
 */
+#define ULR_McL_INFO

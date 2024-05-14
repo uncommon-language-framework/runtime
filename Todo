@@ -3,11 +3,12 @@
 - change some reinterpret casts in stdlib to normal casts
 - add runtime member reordering for runtime inheritance once dynamic type generation is allowed (field reordering)
 - dynamic generic type generation
-	- nested generic type generation/support
-		- for this, have the compiler create a list of static nested generics before LLIR in generic IR string
+	- generic-in-generic type generation/support
+		- for this, have the compiler create a list of static generic-in-generics before LLIR in generic IR string
 			- have each nested generic assigned a type ident (which the compiler should have already used in its LLIR) and any appearances of `sizeof_TypeIdent` should be replaced with the size of the nested generic by the runtime
 - prebuilt generic type loading
-- array type deps loading from metadata ^ - WILL NOT IMPL - array types can be created from InitAssembly
+- array type deps loading from metadata - WILL NOT IMPL - array types can be created from InitAssembly
 - have loader support all valid modifiers for different attributes
 - add static ctor support - WILL NOT IMPL - decided that compilers should manage static ctors themselves
 - remove switch case blocks in Loader that are always true or false
+- Attach vtable calls to method names somehow for jit compilation (e.g. create a mapping between name and number)
