@@ -59,8 +59,11 @@ namespace ULR::IL
 
 		/* Below are UIL signals, used to section code */
 		BeginType,
+		EndTypeMeta,
 		EndType,
 		BeginMethod,
+		BeginCtor,
+		BeginDtor,
 		EndMethod,
 		BeginSection,
 		EndSection,
@@ -75,7 +78,8 @@ namespace ULR::IL
 		Static,
 		Instance,
 		ArgumentPassed,
-		LocalVariable
+		LocalVariable,
+		Native
 	};
 
 	enum NumericalTypeIdentifiers : byte
@@ -95,7 +99,8 @@ namespace ULR::IL
 
 	class JITContext
 	{
-		std::vector<void*> allocated;
+		std::vector<void*> virt_alloced;
+		std::vector<void*> malloc_alloced;
 		Resolver::ULRAPIImpl* api;
 		
 		public:

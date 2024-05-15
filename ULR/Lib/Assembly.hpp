@@ -21,7 +21,7 @@
 
 namespace ULR
 {
-	enum TypeType
+	enum TypeType : byte // also used with IL
 	{
 		Class,
 		Struct,
@@ -33,16 +33,16 @@ namespace ULR
 
 	enum MemberType
 	{
-		Method = 1,
+		Method,
 		Field,
 		Ctor,
 		Dtor,
 		Property
 	};
 
-	enum Modifiers
+	enum Modifiers : uint16_t // also used with IL
 	{
-		Private = 0, // TODO: MAY NEED TO CHANGE THIS FOR PRIVATE CHECKS / OR CHECK THAT IT IS NOT PUBLIC/PROTECTED/INTERNAL
+		Private = 0,
 		Public = 1 << 0,
 		Protected = 1 << 1,
 		Internal = 1 << 2,

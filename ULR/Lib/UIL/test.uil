@@ -3,7 +3,7 @@ public class Program:
 		.local [System]String[] arg
 		.local [System]Int32
 		
-		ldstr "Hello, World!"
+		ldstr "Hello, World!" // args passed in reverse order
 		call static [System]Void[System]Console.WriteLine([System]String)
 
 		ldnc i32 4
