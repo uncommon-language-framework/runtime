@@ -45,8 +45,10 @@ namespace ULR::IL
 		LdStr,
 		LdNC,
 		LdFld,
+		LdFnP,
 		LdLoc,
 		LdElem,
+		LdTpO,
 		Call,
 		VCall,
 		StFld,
@@ -82,7 +84,7 @@ namespace ULR::IL
 		Native
 	};
 
-	enum NumericalTypeIdentifiers : byte
+	enum NumericalTypeIdentifier : byte
 	{
 		Int8,
 		UInt8,

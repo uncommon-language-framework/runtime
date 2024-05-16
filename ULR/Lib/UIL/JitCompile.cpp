@@ -69,6 +69,8 @@ namespace ULR::IL
 
 	// TODO: add support for ctors and dtors
 	// TODO: add support for generic IL
+	// NOTE: consider using std::list due to all the insertions and lack of random access
+	// NOTE: this compiles for little endian, check system endianness and use correct endian -- upon further thought this may not be an issue since endianness would also apply to the assembled assembly
 	CompilationError JITContext::StackBaseCompile(Assembly* meta_asm, byte il[], byte string_ref[])
 	{
 		Helpers::EvalStack eval_stack;
@@ -76,7 +78,7 @@ namespace ULR::IL
 		size_t i = 0;
 
 		std::map<byte*, MemberInfo*> replace_addrs;
-		std::map<MemberInfo*, std::vector<byte>> dynamic_code;
+		std::map<MemberInfo*, std::vector<byte>> dynamic_code; // maybe make std::vector<byte>&
 
 		/* FIRST PASS - MAP OUT ASSEMBLY METADATA */
 		while (il[i] != OpCodes::EndAssembly)
@@ -185,6 +187,8 @@ namespace ULR::IL
 		(*api->read_assemblies)[meta_asm->name] = meta_asm;
 		(*api->assemblies)[meta_asm->name] = meta_asm;
 
+		char* (*special_string_MAKE_FROM_LITERAL)(const char* str, int len) = (char* (*)(const char*, int)) api->LocateSymbol(api->LocateAssembly("Sytstem.Runtime.Native.dll"), "special_string_MAKE_FROM_LITERAL");
+
 		/* SECOND PASS - IL TO ASSEMBLED BYTES */
 		while (il[i] != OpCodes::EndAssembly)
 		{
@@ -232,11 +236,8 @@ namespace ULR::IL
 					{
 						FieldInfo* field = (FieldInfo*) type->inst_attrs[name][0];
 
-						uint16_t offset = *((uint16_t*) &il[i]);
+						i+=2; // skip two bytes of what would be offset
 
-						i+=2; // skip two bytes of offset
-
-						field->offset = (void*) offset;
 						field->valtype = valtype;
 					}
 				}
@@ -342,25 +343,204 @@ namespace ULR::IL
 
 								break;
 							case OpCodes::Add:
+								i++;
 								code.push_back(0x58); // pop rax
 								code.insert(code.end(), { 0x48, 0x01, 0x04, 0x24 }); // add [rsp], rax
 								break;
 							case OpCodes::Sub:
+								i++;
 								code.push_back(0x58); // pop rax
 								code.insert(code.end(), { 0x48, 0x29, 0x04, 0x24 }); // sub [rsp], rax
 								break;
 							case OpCodes::Mul:
+								i++;
 								code.push_back(0x58); // pop rax
 								code.push_back(0x5D); // pop rbp
 								code.insert(code.end(), { 0x48, 0xF7, 0xE5 }); // mul rbp
 								code.push_back(0x50); // push rax
 								break;
+
+							/* go in order */
+							case OpCodes::LdStr:
+								i++;
+								
+								std::string_view str = LookupString(&il[i], string_ref);
+
+								char* ulrstr = special_string_MAKE_FROM_LITERAL(str.data(), str.length());
+
+								// mov rax, ulrstr
+								code.insert(code.end(), { 0x48, 0xB8 });
+								code.insert(code.end(), &ulrstr, (&ulrstr)+sizeof(ulrstr));
+								
+								code.push_back(0x50); // push rax
+								break;
+							case OpCodes::LdNC:
+								i++;
+
+								NumericalTypeIdentifier constant_type = (NumericalTypeIdentifier) il[i];
+
+								i++;
+
+								switch (constant_type)
+								{
+
+								}
+
+								break;
+
+							case OpCodes::LdFld:
+								i++;
+
+								Flags binding = (Flags) il[i];
+
+								i++;
+
+								if (binding == Flags::Static)
+								{
+									std::string type_name_cpp = std::string(LookupString(&il[i], string_ref));
+
+									i+=4; // from string ref
+
+									std::string field_name_cpp = std::string(LookupString(&il[i], string_ref));
+
+									i+=4; // from string ref
+
+									FieldInfo* field = (FieldInfo*) api->GetType(type_name_cpp.data())->static_attrs[field_name_cpp.data()][0];
+
+									if ((field->valtype->decl_type == TypeType::Struct) && (field->valtype->size != 8)) // unfriendly struct types
+									{
+										switch (field->valtype->size)
+										{
+											case 1:
+												/*
+													mov rax, 0x0 (addr filled later)
+													movzx rax, byte ptr [rax]
+												*/
+												code.insert(code.end(), { 0x48, 0xB8 }); // mov rax,
+
+												replace_addrs[&code[code.size()]] = field;
+
+												code.insert(code.end(), sizeof(void*), 0); // 0x0 (address will be filled later)
+
+												code.insert(code.end(), { 0x48, 0x0F, 0xB6, 0x00 }); // movzx rax, byte ptr [rax]
+												break;
+											case 2:
+												/*
+													mov rax, 0x0 (addr filled later)
+													movzx rax, word ptr [rax]
+												*/
+
+												code.insert(code.end(), { 0x48, 0xB8 }); // mov rax,
+
+												replace_addrs[&code[code.size()]] = field;
+
+												code.insert(code.end(), sizeof(void*), 0); // 0x0 (address will be filled later)
+
+												code.insert(code.end(), { 0x48, 0x0F, 0xB7, 0x00 }); // movzx rax, byte ptr [rax]										
+												break;
+											case 4:
+												/*
+													mov eax, [0x0] (addr filled later)
+												*/
+
+												code.push_back(0xA1); // mov eax,
+												
+												replace_addrs[&code[code.size()]] = field;
+
+												code.insert(code.end(), sizeof(void*), 0); // [0x0] (address will be filled later)
+												break;
+											default:
+												code.insert(code.end(), { 0x48, 0xB8 }); // mov, rax
+
+												replace_addrs[&code[code.size()]] = field;
+
+												code.insert(code.end(), sizeof(void*), 0); // 0x0 (address will be filled later)
+												break;
+										}
+
+									}
+									else // reference types and 8-byte struct types
+									{
+										code.insert(code.end(), { 0x48, 0xA1, }); // mov rax,
+
+										replace_addrs[&code[code.size()]] = field;
+
+										code.insert(code.end(), sizeof(void*), 0); // [0x0] (address will be filled later)
+									}
+								}
+								else if (binding == Flags::Instance)
+								{
+									std::string type_name_cpp = std::string(LookupString(&il[i], string_ref));
+
+									i+=4; // from string ref
+
+									std::string field_name_cpp = std::string(LookupString(&il[i], string_ref));
+
+									i+=4; // from string ref
+
+									FieldInfo* field = (FieldInfo*) api->GetType(type_name_cpp.data())->static_attrs[field_name_cpp.data()][0];
+
+									// pop the object from the eval stack, add the offset & dereference
+
+									uint32_t offset = (uint32_t) field->offset;
+
+									if ((field->valtype->decl_type == TypeType::Struct) && (field->valtype->size != 8)) // unfriendly struct types
+									{
+										switch (field->valtype->size)
+										{
+											case 1:
+												/*
+													pop rax
+													movzx rax, byte [rax+field_offset]
+												*/
+												code.insert(code.end(), { 0x48, 0x0F, 0xB6, 0x80 });
+												code.insert(code.end(), &offset, (&offset)+1);
+												break;
+											case 2:
+												/*
+													pop rax
+													movzx rax, word [rax+field_offset]
+												*/
+												code.insert(code.end(), { 0x48, 0x0F, 0xB7, 0x80 });
+												code.insert(code.end(), &offset, (&offset)+1);
+												break;
+											case 4:
+												/*
+													pop rax
+													mov eax, [rax+field_offset]
+												*/
+												code.insert(code.end(), { 0x8B, 0x80 });
+												code.insert(code.end(), &offset, (&offset)+1);
+												break;
+											default:
+												/*
+													pop rax
+													lea rax, [rax+field_offset]
+												*/
+												code.insert(code.end(), { 0x58, 0x48, 0x8D, 0x80 });
+												code.insert(code.end(), &offset, (&offset)+1);
+
+												break;
+										}
+
+									}
+									else // reference types and 8-byte struct types
+									{
+										/*
+											pop rax
+											mov rax, [rax+field_offset]
+										*/
+										code.insert(code.end(), { 0x58, 0x48, 0x8B, 0x80 });
+										code.insert(code.end(), &offset, (&offset)+1);
+									}
+								}
+
+								code.push_back(0x50); // push rax (push loaded field to the eval stack)
+								break;
 							default:
 								return { "Unknown opcode", CompilationError::ErrorCode::InvalidInstr, &il[i] };
 								break;
 						}
-
-						i++;
 					}
 					
 					std::vector<byte> offset = Helpers::convert_to_rbp_offset(locals_size);
@@ -371,7 +551,9 @@ namespace ULR::IL
 					// sub rsp, locals_size
 
 					code.insert(code.begin(), offset.begin(), offset.end());
-					code.insert(code.begin(), { 0x55, 0x48, 0x89, 0xE5, 0x48, 0x83, 0xEC });
+					if (offset.size() == 1) code.insert(code.begin(), { 0x83, 0xEC });
+					else code.insert(code.begin(), { 0x81, 0xEC });
+					code.insert(code.begin(), { 0x55, 0x48, 0x89, 0xE5, 0x48 });
 
 
 					// epilog

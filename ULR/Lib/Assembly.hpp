@@ -16,7 +16,7 @@
 
 #define IsBoxableStruct(typeptr) typeptr->decl_type == TypeType::Struct
 #define IsEvenStructSize(typeptr) typeptr->size == 1 || typeptr->size == 2 || typeptr->size == 4 || typeptr->size == 8
-// everything <= 8 should be friendly since the rest of the bytes
+// everything <= 8 should be friendly since the rest of the bytes would be padding
 #define IsFriendlyStructSizex64(typeptr) typeptr->size <= 8
 
 namespace ULR
