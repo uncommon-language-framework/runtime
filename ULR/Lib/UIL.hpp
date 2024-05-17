@@ -18,7 +18,8 @@ namespace ULR::IL
 			TypeExpected,
 			MemberExpected,
 			InvalidInstr,
-			LocalTypeExpected
+			LocalTypeExpected,
+			InvalidTypeIdentifer		
 		};
 
 		char* error;
@@ -42,6 +43,7 @@ namespace ULR::IL
 		Or,
 		Not,
 		Xor,
+		CstNC,
 		LdStr,
 		LdNC,
 		LdFld,

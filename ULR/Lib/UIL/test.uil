@@ -5,16 +5,17 @@ public class Program:
 		
 		ldstr "Hello, World!" // args passed in reverse order
 		ldfnp static [System]Void [System.Console]::WriteLine([System]String)
-		call [System]Void (System[String])
+		call static [System]Void (System[String])
 
-		ldnc i32 4
+		ldnc i16 4
+		cstnc i16 i32
 		ldnc i32 5
 		add i32
 		stloc 1
 
 		ldloc 1
 		ldfnp static [System]Void [System.Console]::WriteLine([System]Int32)
-		call [System]Void (System[Int32])
+		call static [System]Void (System[Int32])
 
 		ldnc i32 0
 		ret

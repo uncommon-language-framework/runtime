@@ -23,28 +23,8 @@ namespace ULR::IL
 
 		using EvalStack = std::stack<StackValueExpression>;
 
-		using LocalLookupTable = std::vector<int>;
-
-		// this only works in little endian
-		std::vector<byte> convert_to_rbp_offset(int offset) 
-		{
-			if (offset <= 0)
-			{
-				if (offset >= -128) return { (byte) (256+offset) };
-
-				int reverse_offset = UINT32_MAX+offset;
-
-				return std::vector<byte>(reinterpret_cast<byte*>(reverse_offset), reinterpret_cast<byte*>(reverse_offset)+4);	
-			}
-
-
-			if (offset >= 128)
-			{
-				return std::vector<byte>(reinterpret_cast<byte*>(offset), reinterpret_cast<byte*>(offset)+4);
-			}
-
-			return { (byte) offset };
-		}
+		using LocalLookupTable = std::vector<unsigned int>;
+		
 	}
 
 	JITContext::JITContext(Resolver::ULRAPIImpl* api)
@@ -69,6 +49,7 @@ namespace ULR::IL
 
 	// TODO: add support for ctors and dtors
 	// TODO: add support for generic IL
+	// TODO: add support for float operations (within the switch case statements)
 	// NOTE: consider using std::list due to all the insertions and lack of random access
 	// NOTE: this compiles for little endian, check system endianness and use correct endian -- upon further thought this may not be an issue since endianness would also apply to the assembled assembly
 	CompilationError JITContext::StackBaseCompile(Assembly* meta_asm, byte il[], byte string_ref[])
@@ -249,7 +230,7 @@ namespace ULR::IL
 
 					std::vector<byte> code(16);
 					Helpers::LocalLookupTable locals;
-					size_t locals_size;
+					unsigned int locals_size;
 
 					i++;
 
@@ -344,15 +325,66 @@ namespace ULR::IL
 								break;
 							case OpCodes::Add:
 								i++;
-								code.push_back(0x58); // pop rax
-								code.insert(code.end(), { 0x48, 0x01, 0x04, 0x24 }); // add [rsp], rax
-								break;
-							case OpCodes::Sub:
+
+								NumericalTypeIdentifier constant_type = (NumericalTypeIdentifier) il[i];
+
 								i++;
+
 								code.push_back(0x58); // pop rax
-								code.insert(code.end(), { 0x48, 0x29, 0x04, 0x24 }); // sub [rsp], rax
+
+
+								switch (constant_type)
+								{
+									case Int8: // all of these fall into the int32 case, since it has the shortest instr length
+									case UInt8:
+									case Int16:
+									case UInt16:
+									case Int32:
+									case UInt32:
+										code.insert(code.end(), { 0x01, 0x04, 0x24 });
+
+										break;
+									case Int64:
+									case UInt64:
+										code.insert(code.end(), { 0x48, 0x01, 0x04, 0x24 }); // add [rsp], rax
+
+										break;																													
+									default:
+										return { "Invalid numerical type identifier", CompilationError::ErrorCode::InvalidTypeIdentifer, &il[i]};
+								}
+
 								break;
-							case OpCodes::Mul:
+							case OpCodes::Sub: // TODO: needs fix
+								i++;
+
+								NumericalTypeIdentifier constant_type = (NumericalTypeIdentifier) il[i];
+
+								i++;
+
+								code.push_back(0x58); // pop rax
+
+								switch (constant_type)
+								{
+									case Int8: // all of these fall into the int32 case, since it has the shortest instr length
+									case UInt8:
+									case Int16:
+									case UInt16:
+									case Int32:
+									case UInt32:
+										code.insert(code.end(), { 0x29, 0x04, 0x24 }); // sub [rsp], eax
+
+										break;
+									case Int64:
+									case UInt64:
+										code.insert(code.end(), { 0x48, 0x29, 0x04, 0x24 }); // sub [rsp], rax
+
+										break;																													
+									default:
+										return { "Invalid numerical type identifier", CompilationError::ErrorCode::InvalidTypeIdentifer, &il[i]};
+								}
+
+								break;
+							case OpCodes::Mul: // needs fix
 								i++;
 								code.push_back(0x58); // pop rax
 								code.push_back(0x5D); // pop rbp
@@ -361,10 +393,256 @@ namespace ULR::IL
 								break;
 
 							/* go in order */
+							case OpCodes::CstNC:
+								i++;
+
+								NumericalTypeIdentifier from_type = (NumericalTypeIdentifier) il[i];
+
+								i++;
+
+								NumericalTypeIdentifier to_type = (NumericalTypeIdentifier) il[i];
+
+								i++;
+
+								switch (from_type)
+								{
+									case Int8:
+										switch (to_type)
+										{
+											case UInt8: break;
+											case UInt16: break;
+											case UInt32: break;
+											case UInt64: break;
+
+											case Int16:
+												/*
+													pop rax
+													movsx ax, al
+													movzx rax, ax
+													push rax
+												*/
+
+												code.insert(code.end(), { 0x58, 0x66, 0x0F, 0xBE, 0xC0, 0x48, 0x0F, 0xB7, 0xC0, 0x50 });
+
+												break;
+											case Int32:
+												/*
+													pop rax
+													movsx eax, al
+													push rax
+												*/
+
+												code.insert(code.end(), { 0x58, 0x0F, 0xBE, 0xC0, 0x50 });
+												break;
+
+											case Int64:
+												/*
+													pop rax
+													movsx rax, al
+													push rax
+												*/
+
+												code.insert(code.end(), { 0x58, 0x48, 0x0F, 0xBE, 0xC0, 0x50 });
+												break;
+											default:
+												return { "Invalid to_type for cstnc", CompilationError::ErrorCode::InvalidTypeIdentifer, &il[i]};
+										}
+
+										break;
+									case UInt8: break; // no operation needed since the rest of the uint8 bits on the stack are zeroed anyways
+									case Int16:
+										switch (to_type)
+										{
+											case UInt16: break;
+											case UInt32: break;
+											case UInt64: break;
+
+											case UInt8:
+											case Int8:
+												/*
+													pop rax
+													movzx rax, al
+													push rax
+												*/
+
+												code.insert(code.end(), { 0x58, 0x48, 0x0F, 0xB6, 0xC0, 0x50 });
+
+											case Int32:
+												/*
+													pop rax
+													movsx eax, ax
+													push rax
+												*/
+
+												code.insert(code.end(), { 0x58, 0x0F, 0xBF, 0xC0, 0x50 });
+												break;
+
+											case Int64:
+												/*
+													pop rax
+													movsx rax, ax
+													push rax
+												*/
+
+												code.insert(code.end(), { 0x58, 0x48, 0x0F, 0xBF, 0xC0, 0x50 });
+												break;
+											default:
+												return { "Invalid to_type for cstnc", CompilationError::ErrorCode::InvalidTypeIdentifer, &il[i]};
+										}
+
+										break;
+
+									case UInt16:
+										switch (to_type)
+										{
+											case Int16: break; 
+											case UInt32: break;
+											case UInt64: break;
+											case Int32: break;
+											case Int64: break;
+
+											case UInt8:
+											case Int8:
+												/*
+													pop rax
+													movzx rax, al
+													push rax
+												*/
+
+												code.insert(code.end(), { 0x58, 0x48, 0x0F, 0xB6, 0xC0, 0x50 });
+											default:
+												return { "Invalid to_type for cstnc", CompilationError::ErrorCode::InvalidTypeIdentifer, &il[i]};											
+										}
+										
+										break;
+									case Int32:
+										switch (to_type)
+										{
+											case UInt32: break;
+											case UInt64: break;
+
+											case UInt8:
+											case Int8:
+												/*
+													pop rax
+													movzx rax, al
+													push rax
+												*/
+
+												code.insert(code.end(), { 0x58, 0x48, 0x0F, 0xB6, 0xC0, 0x50 });
+
+											case UInt16:
+											case Int16:
+												/*
+													pop rax
+													movzx rax, ax
+													push rax
+												*/
+
+												code.insert(code.end(), { 0x58, 0x48, 0x0F, 0xB7, 0xC0, 0x50 });
+												break;
+											
+											case Int64:
+												/*
+													pop rax
+													movsx rax, eax
+													push rax
+												*/
+
+												code.insert(code.end(), { 0x58, 0x48, 0x63, 0xC0, 0x50 });
+												break;
+											default:
+												return { "Invalid to_type for cstnc", CompilationError::ErrorCode::InvalidTypeIdentifer, &il[i]};											
+										}
+
+										break;
+									case UInt32:
+										switch (to_type)
+										{
+											case Int32: break;
+											case UInt64: break;
+											case Int64: break;
+
+											case UInt8:
+											case Int8:
+												/*
+													pop rax
+													movzx rax, al
+													push rax
+												*/
+
+												code.insert(code.end(), { 0x58, 0x48, 0x0F, 0xB6, 0xC0, 0x50 });
+
+											case UInt16:
+											case Int16:
+												/*
+													pop rax
+													movzx rax, ax
+													push rax
+												*/
+
+												code.insert(code.end(), { 0x58, 0x48, 0x0F, 0xB7, 0xC0, 0x50 });
+												break;
+											default:
+												return { "Invalid to_type for cstnc", CompilationError::ErrorCode::InvalidTypeIdentifer, &il[i]};											
+										}
+
+										break;
+									case UInt64: // these two cases (Int64 & UInt64 can be combined because they can only be casted down for a size change)
+									case Int64:
+										switch (to_type)
+										{
+											case UInt64: break;
+											case Int64: break;
+
+											case UInt8:
+											case Int8:
+												/*
+													pop rax
+													movzx rax, al
+													push rax
+												*/
+
+												code.insert(code.end(), { 0x58, 0x48, 0x0F, 0xB6, 0xC0, 0x50 });
+
+											case UInt16:
+											case Int16:
+												/*
+													pop rax
+													movzx rax, ax
+													push rax
+												*/
+
+												code.insert(code.end(), { 0x58, 0x48, 0x0F, 0xB7, 0xC0, 0x50 });
+												break;
+
+											case UInt32:
+											case Int32:
+												/*
+													pop rax
+													mov eax, eax // use this to zero out the upper 32 bits of rax
+													push rax													
+												*/
+
+												code.insert(code.end(), { 0x58, 0x89, 0xC0, 0x50 });
+												break;
+											default:
+												return { "Invalid to_type for cstnc", CompilationError::ErrorCode::InvalidTypeIdentifer, &il[i]};											
+										}
+
+										break;
+									default:
+										return { "Invalid to_type for cstnc", CompilationError::ErrorCode::InvalidTypeIdentifer, &il[i]};
+
+								}
+
+							/* go in order */
 							case OpCodes::LdStr:
 								i++;
 								
 								std::string_view str = LookupString(&il[i], string_ref);
+
+								i+=4; // from string lookup
 
 								char* ulrstr = special_string_MAKE_FROM_LITERAL(str.data(), str.length());
 
@@ -383,11 +661,68 @@ namespace ULR::IL
 
 								switch (constant_type)
 								{
+									case Int8: // falls into below case
+									case UInt8:
+										char num = il[i];
 
+										i++;
+
+										/*
+											push num
+										*/
+
+										code.push_back(0x6A);
+										code.push_back(num);
+
+										break;
+									case Int16: // falls into next case
+									case UInt16:
+										uint32_t num = *(uint16_t*) il; // we store it as a uint32 because the push instr doesn't take 16-bit only vals; this is probably faster than zero-extending ax and then pushing it anyway
+
+										i+=2;
+
+										/*
+											push num
+										*/
+										code.push_back(0x68);
+										code.insert(code.end(), &num, &num+1);
+										
+										break;
+									case Int32: // falls into next case
+									case UInt32:
+										uint32_t num = *(uint32_t*) il;
+										
+										i+=4;
+
+										/*
+											push num
+										*/
+										code.push_back(0x68);
+										code.insert(code.end(), &num, &num+1);
+
+										break;
+									case Int64:
+									case UInt64:
+										uint64_t num = *(uint64_t*) il;
+										
+										i+=8;
+
+										/*
+											mov rax, num
+										*/
+
+										code.insert(code.end(), { 0x48, 0xB8 });
+										code.insert(code.end(), &num, &num+1);
+										
+
+										code.push_back(0x50); // push rax
+
+										break;																																																
+									default:
+										return { "Invalid numerical type identifier", CompilationError::ErrorCode::InvalidTypeIdentifer, &il[i]};
 								}
 
 								break;
-
 							case OpCodes::LdFld:
 								i++;
 
@@ -543,17 +878,15 @@ namespace ULR::IL
 						}
 					}
 					
-					std::vector<byte> offset = Helpers::convert_to_rbp_offset(locals_size);
+					// TODO: fix prolog & epilog 
 
 					// the three lines below insert the prolog (in reverse order visually but forward order in reality)
 					// push rbp
-	     			// move rbp, rsp
+	     			// mov rbp, rsp
 					// sub rsp, locals_size
 
-					code.insert(code.begin(), offset.begin(), offset.end());
-					if (offset.size() == 1) code.insert(code.begin(), { 0x83, 0xEC });
-					else code.insert(code.begin(), { 0x81, 0xEC });
-					code.insert(code.begin(), { 0x55, 0x48, 0x89, 0xE5, 0x48 });
+					code.insert(code.begin(), &locals_size, &locals_size+1);
+					code.insert(code.begin(), { 0x55, 0x48, 0x89, 0xE5, 0x48, 0x81, 0xEC });
 
 
 					// epilog
@@ -561,8 +894,8 @@ namespace ULR::IL
 					// pop rbp
 					// ret
 
-					code.insert(code.end(), { 0x48, 0x83, 0xC4 });
-					code.insert(code.end(), offset.begin(), offset.end());
+					code.insert(code.end(), { 0x48, 0x81, 0xC4 });
+					code.insert(code.end(), &locals_size, &locals_size+1);
 					code.push_back(0x5D); // pop rbp
 					code.push_back(0xC3); // ret
 
