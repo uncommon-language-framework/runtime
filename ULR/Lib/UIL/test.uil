@@ -1,11 +1,15 @@
 public class Program:
-	public static [System]Int32 Main:
-		.local [System]String[] arg
+	public static [System]Int32 Main([System]String):
+		.local [System]String[]
 		.local [System]Int32
-		
+
+		ldapl 0
+		stapl 0
+
 		ldstr "Hello, World!" // args passed in reverse order
-		ldfnp static [System]Void [System.Console]::WriteLine([System]String)
-		call static [System]Void (System[String])
+		ldfnp 
+		call static [System]Void [System.Console]::WriteLine([System]String)
+
 
 		ldnc i16 4
 		cstnc i16 i32
@@ -14,8 +18,7 @@ public class Program:
 		stloc 1
 
 		ldloc 1
-		ldfnp static [System]Void [System.Console]::WriteLine([System]Int32)
-		call static [System]Void (System[Int32])
+		call static [System]Void [System.Console]::WriteLine([System]Int32)
 
 		ldnc i32 0
 		ret

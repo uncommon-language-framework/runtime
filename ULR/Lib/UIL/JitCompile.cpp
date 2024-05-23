@@ -1,6 +1,9 @@
 #include "../UIL.hpp"
 #include <stack>
 
+#define HELPER_MARKER(num)
+#define TODO_ADD_ASM add asm bytes;
+
 namespace ULR::IL
 {
 	namespace Helpers
@@ -23,7 +26,13 @@ namespace ULR::IL
 
 		using EvalStack = std::stack<StackValueExpression>;
 
-		using LocalLookupTable = std::vector<unsigned int>;
+		struct LocalInfo
+		{
+			int offset;
+			size_t size;
+		};
+
+		using LocalLookupTable = std::vector<LocalInfo>;
 		
 	}
 
@@ -50,6 +59,7 @@ namespace ULR::IL
 	// TODO: add support for ctors and dtors
 	// TODO: add support for generic IL
 	// TODO: add support for float operations (within the switch case statements)
+	// TODO: ensure that evaluation stack is clear before returning (just use a counter var and add necessary bytes to rsp in epilogs)
 	// NOTE: consider using std::list due to all the insertions and lack of random access
 	// NOTE: this compiles for little endian, check system endianness and use correct endian -- upon further thought this may not be an issue since endianness would also apply to the assembled assembly
 	CompilationError JITContext::StackBaseCompile(Assembly* meta_asm, byte il[], byte string_ref[])
@@ -59,12 +69,13 @@ namespace ULR::IL
 		size_t i = 0;
 
 		std::map<byte*, MemberInfo*> replace_addrs;
+		std::vector<byte*> add_epilog;
 		std::map<MemberInfo*, std::vector<byte>> dynamic_code; // maybe make std::vector<byte>&
 
 		/* FIRST PASS - MAP OUT ASSEMBLY METADATA */
-		while (il[i] != OpCodes::EndAssembly)
+		while (il[i] != EndAssembly)
 		{
-			if (il[i] != OpCodes::BeginType)
+			if (il[i] != BeginType)
 			{
 				return { "Expected type declaration signal", CompilationError::ErrorCode::TypeExpected, &il[i] };
 			}
@@ -88,13 +99,13 @@ namespace ULR::IL
 
 			i+=4; // skip what would be the string lookup for the type's base
 
-			while (il[i] != OpCodes::EndTypeMeta) i+=4; // skip what would be a string lookup for an implemented interface
+			while (il[i] != EndTypeMeta) i+=4; // skip what would be a string lookup for an implemented interface
 
 			i++; // skip EndTypeMeta signal
 
-			while (il[i] != OpCodes::EndType)
+			while (il[i] != EndType)
 			{
-				if (il[i] == OpCodes::FieldDecl)
+				if (il[i] == FieldDecl)
 				{
 					i++;
 
@@ -126,7 +137,7 @@ namespace ULR::IL
 						type->AddInstanceMember(info);
 					}
 				}
-				else if (il[i] == OpCodes::BeginMethod)
+				else if (il[i] == BeginMethod)
 				{
 					i++;
 
@@ -145,6 +156,16 @@ namespace ULR::IL
 					size_t method_size = *((uint32_t*) &il[i]);
 
 					i+=4; // skip four bytes of method size
+
+					// method args
+					while (il[i] != OpCodes::EndSection)
+					{
+						i+=4; // skip what would be a string lookup for typename
+					}
+
+					i++; // skip EndSection opcode
+
+					// end method arg lookup
 
 					i+=method_size;
 
@@ -171,9 +192,9 @@ namespace ULR::IL
 		char* (*special_string_MAKE_FROM_LITERAL)(const char* str, int len) = (char* (*)(const char*, int)) api->LocateSymbol(api->LocateAssembly("Sytstem.Runtime.Native.dll"), "special_string_MAKE_FROM_LITERAL");
 
 		/* SECOND PASS - IL TO ASSEMBLED BYTES */
-		while (il[i] != OpCodes::EndAssembly)
+		while (il[i] != EndAssembly)
 		{
-			if (il[i] != OpCodes::BeginType)
+			if (il[i] != BeginType)
 			{
 				return { "Expected type declaration signal", CompilationError::ErrorCode::TypeExpected, &il[i] };
 			}
@@ -182,9 +203,9 @@ namespace ULR::IL
 
 			Type* type = api->GetType("");
 
-			while (il[i] != OpCodes::EndType)
+			while (il[i] != EndType)
 			{
-				if (il[i] == OpCodes::FieldDecl)
+				if (il[i] == FieldDecl)
 				{
 					i++;
 
@@ -222,15 +243,16 @@ namespace ULR::IL
 						field->valtype = valtype;
 					}
 				}
-				else if (il[i] == OpCodes::BeginMethod)
+				else if (il[i] == BeginMethod)
 				{
-					std::vector<Type*> argsig;
-					Type* rettype;
 					Modifiers modifiers;
 
 					std::vector<byte> code(16);
 					Helpers::LocalLookupTable locals;
+					Helpers::LocalLookupTable argpassedlocals;
 					unsigned int locals_size;
+
+					unsigned int copy_to_rbp_offset_for_return = 0;
 
 					i++;
 
@@ -263,67 +285,90 @@ namespace ULR::IL
 						curr_method = (MethodInfo*) type->inst_attrs[namecpp.data()][overload_number];
 					}
 
-					while (il[i] != OpCodes::EndMethod)
+					curr_method->rettype = rettype;
+
+					if (IsBoxableStruct(rettype) && !IsFriendlyStructSizex64(rettype))
+					{
+						// temporarily drop rettype in argsig since it should take up the first slot in reality
+
+						copy_to_rbp_offset_for_return = 16; // rbp+16 should be the addr of the first arg when below is exec'd
+
+						code.insert(code.end(), { 0x48, 0x89, 0x4D, 0x10 }); // mov [rbp+16], rcx
+
+						curr_method->argsig.push_back(rettype);
+					}
+
+					// method args
+					while (il[i] != OpCodes::EndSection)
+					{
+						std::string argname = std::string(LookupString(&il[i], string_ref));
+
+						Type* argtype = api->GetType(argname.data());
+
+						size_t arg_store_size = IsBoxableStruct(argtype) ? argtype->size : 8; 
+
+						curr_method->argsig.push_back(argtype);
+						
+						switch (curr_method->argsig.size()) // TODO: make diff instrs for 1, 2, 4, and 8 byte argvals
+						{
+							case 1: // mov [rbp+16], rcx
+								argpassedlocals.push_back({ 16, arg_store_size });
+
+								code.insert(code.end(), { 0x48, 0x89, 0x4D, 0x10 });
+								break;
+							case 2: // mov [rbp+24], rdx
+								argpassedlocals.push_back({ 24, arg_store_size });
+
+								code.insert(code.end(), { 0x48, 0x89, 0x55, 0x18 });
+								break;
+							case 3: // mov [rbp+32], r8
+								argpassedlocals.push_back({ 32, arg_store_size });
+
+								code.insert(code.end(), { 0x4C, 0x89, 0x45, 0x20 });
+								break;												
+							case 4: // mov [rbp+40], r9
+								argpassedlocals.push_back({ 40, arg_store_size });
+
+								code.insert(code.end(), { 0x4C, 0x89, 0x4D, 0x28 });
+								break;												
+							default:
+								argpassedlocals.push_back({ (int) (48+(curr_method->argsig.size()-6)*8), arg_store_size }); // todo: find which stack addr args start from (replace 64)
+								// for above also see argsig.size() may need to use total args-argsig.size() (reverse take) (grab total args from reading phase?)
+								break;
+						}
+					}
+
+					i++; // skip EndSection opcode
+
+					// end get method args
+
+					if (copy_to_rbp_offset_for_return)
+					{
+						// remove the first artificially added arg (see where) `copy_to_rbp_offset_for_return` is set
+						curr_method->argsig.erase(curr_method->argsig.begin(), curr_method->argsig.begin()+1); 
+					}
+
+
+					while (il[i] != EndMethod)
 					{
 						byte opcode = il[i];
 
 						switch (opcode)
 						{
-							case OpCodes::LocalDecl:
+							case LocalDecl:
 								i++;
-								{
-									Type* lcl_type = api->GetType(std::string(LookupString(&il[i], string_ref)).data());
-									i+=4; // skip four bytes for string lookup
+								
+								Type* lcl_type = api->GetType(std::string(LookupString(&il[i], string_ref)).data());
+								size_t lcl_store_size = IsBoxableStruct(lcl_type) ? lcl_type->size : 8; 
 
-							
-									if (il[i] == Flags::ArgumentPassed)
-									{
-										argsig.push_back(lcl_type);
 
-										std::vector<byte> offset;
+								i+=4; // skip four bytes for string lookup
 
-										switch (argsig.size()) // TODO: make diff instrs for 1, 2, 4, and 8 byte argvals
-										{
-											case 1: // mov [rbp+16], rcx
-												locals.push_back(16);
+								locals.push_back({ (int) (-locals_size), lcl_store_size });
 
-												code.insert(code.end(), { 0x48, 0x89, 0x4D, 0x10 });
-												break;
-											case 2: // mov [rbp+24], rdx
-												locals.push_back(24);
-
-												code.insert(code.end(), { 0x48, 0x89, 0x55, 0x18 });
-												break;
-											case 3: // mov [rbp+32], r8
-												locals.push_back(32);
-
-												code.insert(code.end(), { 0x4C, 0x89, 0x45, 0x20 });
-												break;												
-											case 4: // mov [rbp+40], r9
-												locals.push_back(40);
-
-												code.insert(code.end(), { 0x4C, 0x89, 0x4D, 0x28 });
-												break;												
-											default:
-												locals.push_back((48+(argsig.size()-6)*8)); // todo: find which stack addr args start from (replace 64)
-												// for above also see argsig.size() may need to use total args-argsig.size() (reverse take) (grab total args from reading phase?)
-												break;
-										}
-									}
-									else if (il[i] == Flags::LocalVariable)
-									{
-										locals.push_back(-locals_size);
-
-										locals_size+=lcl_type->size;
-									}
-									else
-									{
-										return { "Either argument-passed or normal local variable local var type expected", CompilationError::ErrorCode::LocalTypeExpected, &il[i] };
-									}
-								}
-
+								locals_size+=lcl_type->size; // todo: check if this offset is correct
 								break;
-							case OpCodes::Add:
+							case Add:
 								i++;
 
 								NumericalTypeIdentifier constant_type = (NumericalTypeIdentifier) il[i];
@@ -354,7 +399,7 @@ namespace ULR::IL
 								}
 
 								break;
-							case OpCodes::Sub: // TODO: needs fix
+							case Sub: // TODO: needs fix
 								i++;
 
 								NumericalTypeIdentifier constant_type = (NumericalTypeIdentifier) il[i];
@@ -384,8 +429,33 @@ namespace ULR::IL
 								}
 
 								break;
-							case OpCodes::Mul: // needs fix
+							case Mul: // needs fix
 								i++;
+
+								NumericalTypeIdentifier constant_type = (NumericalTypeIdentifier) il[i];
+
+								i++;
+
+								switch (constant_type)
+								{
+									case Int8: // all of these fall into the int32 case, since it has the shortest instr length
+									case UInt8:
+									case Int16:
+									case UInt16:
+									case Int32:
+									case UInt32:
+										code.insert(code.end(), { 0x29, 0x04, 0x24 }); // sub [rsp], eax
+
+										break;
+									case Int64:
+									case UInt64:
+										code.insert(code.end(), { 0x48, 0x29, 0x04, 0x24 }); // sub [rsp], rax
+
+										break;																													
+									default:
+										return { "Invalid numerical type identifier", CompilationError::ErrorCode::InvalidTypeIdentifer, &il[i]};
+								}
+
 								code.push_back(0x58); // pop rax
 								code.push_back(0x5D); // pop rbp
 								code.insert(code.end(), { 0x48, 0xF7, 0xE5 }); // mul rbp
@@ -393,7 +463,7 @@ namespace ULR::IL
 								break;
 
 							/* go in order */
-							case OpCodes::CstNC:
+							case CstNC:
 								i++;
 
 								NumericalTypeIdentifier from_type = (NumericalTypeIdentifier) il[i];
@@ -637,7 +707,7 @@ namespace ULR::IL
 								}
 
 							/* go in order */
-							case OpCodes::LdStr:
+							case LdStr:
 								i++;
 								
 								std::string_view str = LookupString(&il[i], string_ref);
@@ -652,7 +722,7 @@ namespace ULR::IL
 								
 								code.push_back(0x50); // push rax
 								break;
-							case OpCodes::LdNC:
+							case LdNC:
 								i++;
 
 								NumericalTypeIdentifier constant_type = (NumericalTypeIdentifier) il[i];
@@ -723,7 +793,7 @@ namespace ULR::IL
 								}
 
 								break;
-							case OpCodes::LdFld:
+							case LdFld:
 								i++;
 
 								Flags binding = (Flags) il[i];
@@ -872,6 +942,161 @@ namespace ULR::IL
 
 								code.push_back(0x50); // push rax (push loaded field to the eval stack)
 								break;
+							case LdLoc:
+								i++;
+
+								byte loc_num = il[i];
+
+								i++;
+
+								Helpers::LocalInfo local = locals[loc_num];
+
+								if (local.size <= 8)
+								{
+									/*
+										push [rbp+offset]
+									*/
+									code.insert(code.end(), { 0xFF, 0x35 });
+									code.insert(code.end(), &local.offset, &local.offset+1);
+								}
+								else
+								{
+									/*
+										lea rax, [rbp+offset]
+										push rax
+									*/
+									code.insert(code.end(), { 0x48, 0x8D, 0x85 });
+									code.insert(code.end(), &local.offset, &local.offset+1);
+									code.push_back(0x50);
+								}
+								break;
+							case LdAPL:
+								i++;
+
+								byte apl_num = il[i];
+
+								i++;
+
+								Helpers::LocalInfo apl = argpassedlocals[apl_num];
+
+								/*
+									push [rbp+offset]
+
+									even in the apl is a large struct, the address to memory allocated by the caller would have been passed in args so this will load the address properly
+								*/
+								code.insert(code.end(), { 0xFF, 0x35 });
+								code.insert(code.end(), &apl.offset, &apl.offset+1);
+
+								break;
+							case StLoc:
+								i++;
+
+								byte loc_num = il[i];
+
+								i++;
+
+								Helpers::LocalInfo local = locals[loc_num];
+
+								if (local.size <= 8)
+								{
+									/*
+										pop [rbp+offset]
+									*/
+
+									code.insert(code.end(), { 0x8F, 0x85 });
+									code.insert(code.end(), &local.offset, &local.offset+1);
+								}
+								else
+								{
+									code.push_back(0x58); // pop rax
+
+									/*
+										addr of "rvalue" is now in rax; rax+local.size constitutes the pointer to the first byte after the object
+									*/
+
+									for (unsigned int stoffset = 0; stoffset < local.size; stoffset+=8)
+									{
+										unsigned int store_rbp_offset = stoffset+local.offset;
+
+										/*
+											mov rcx, [rax+stoffset]
+											mov [rbp+store_rbp_offset], rcx
+										*/
+
+										code.insert(code.end(), { 0x48, 0x8B, 0x88 });
+										code.insert(code.end(), &stoffset, &stoffset+1);
+
+										code.insert(code.end(), { 0x48, 0x89, 0x8D });
+										code.insert(code.end(), &store_rbp_offset, &store_rbp_offset+1);
+									}
+								}
+
+								break;
+							case StAPL:
+								i++;
+
+								byte apl_num = il[i];
+
+								i++;
+
+								Helpers::LocalInfo apl = argpassedlocals[loc_num];
+
+								if (apl.size <= 8)
+								{
+									/*
+										pop [rbp+offset]
+									*/
+
+									code.insert(code.end(), { 0x8F, 0x85 });
+									code.insert(code.end(), &apl.offset, &apl.offset+1);
+								}
+								else
+								{
+									code.push_back(0x58); // pop rax
+
+									/*
+										mov rdx, [rbp+apl.offset]
+									*/
+									code.insert(code.end(), { 0x48, 0x8B, 0x95 }); 
+									code.insert(code.end(), &apl.offset, &apl.offset+1);
+
+									/*
+										addr of "rvalue" is now in rax; rax+local.size constitutes the pointer to the first byte after the object
+										addr of what to store in is now in rdx
+									*/
+
+									for (unsigned int stoffset = 0; stoffset < apl.size; stoffset+=8)
+									{
+										/*
+											mov rcx, [rax+stoffset]
+											mov [rdx+stoffset], rcx
+										*/
+
+										code.insert(code.end(), { 0x48, 0x8B, 0x88 });
+										code.insert(code.end(), &stoffset, &stoffset+1);
+
+										code.insert(code.end(), { 0x48, 0x89, 0x8A });
+										code.insert(code.end(), &stoffset, &stoffset+1);
+									}
+								}
+								break;
+							case Ret:
+								i++;
+								code.push_back(0x58); // pop rax (last thing on the evaluation stack gets returned)
+
+								if (copy_to_rbp_offset_for_return)
+								{
+									unsigned int size_to_copy = rettype->size;
+
+									// rax holds the addr of the thing we want to return
+									// [rbp+copy_to_rbp_offset_for_return] is the addr we must write to to actually return the value
+									// size_to_copy is the size of the value type
+								}
+
+								add_epilog.push_back(&code[code.size()]);
+								code.insert(code.end(), 9, 0x0); // epilog takes 9 bytes
+								break;
+
 							default:
 								return { "Unknown opcode", CompilationError::ErrorCode::InvalidInstr, &il[i] };
 								break;
@@ -894,10 +1119,28 @@ namespace ULR::IL
 					// pop rbp
 					// ret
 
-					code.insert(code.end(), { 0x48, 0x81, 0xC4 });
-					code.insert(code.end(), &locals_size, &locals_size+1);
-					code.push_back(0x5D); // pop rbp
-					code.push_back(0xC3); // ret
+					// 9 bytes total
+
+					std::vector<byte> epilog(9);
+
+					epilog.insert(epilog.end(), { 0x48, 0x81, 0xC4 });
+					epilog.insert(epilog.end(), &locals_size, &locals_size+1);
+					epilog.emplace_back(0x5D); // pop rbp
+					epilog.emplace_back(0xC3); // ret
+
+					code.insert(code.end(), epilog.begin(), epilog.end());
+
+					if (epilog.size() != 9)
+					{
+						std::cerr << "Epilog is " << epilog.size() << " bytes (epilog.size() != 9)\n";
+						exit(1);
+					}
+
+					/* Resolve unplaced epilogs for `ret` opcodes */
+					for (const auto pos : add_epilog)
+					{
+						memcpy(pos, &epilog[0], epilog.size());
+					}
 
 					i++;
 
@@ -907,8 +1150,6 @@ namespace ULR::IL
 
 					// TODO: fix when new generic system is impl'd
 					
-					curr_method->argsig = argsig;
-					curr_method->rettype = rettype;
 					curr_method->offset = funcaddr;
 				
 					dynamic_code[curr_method] = code;

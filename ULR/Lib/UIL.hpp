@@ -47,14 +47,15 @@ namespace ULR::IL
 		LdStr,
 		LdNC,
 		LdFld,
-		LdFnP,
 		LdLoc,
+		LdAPL,
 		LdElem,
 		LdTpO,
 		Call,
 		VCall,
 		StFld,
 		StLoc,
+		StAPL,
 		StElem,
 		New,
 		NewArr,
@@ -81,7 +82,6 @@ namespace ULR::IL
 	{
 		Static,
 		Instance,
-		ArgumentPassed,
 		LocalVariable,
 		Native
 	};

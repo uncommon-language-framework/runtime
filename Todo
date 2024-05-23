@@ -12,3 +12,7 @@
 - add static ctor support - WILL NOT IMPL - decided that compilers should manage static ctors themselves
 - remove switch case blocks in Loader that are always true or false
 - Attach vtable calls to method names somehow for jit compilation (e.g. create a mapping between name and number)
+- Check MethodInfo::Invoke() on a method with more than 4 args
+	- If stack space needs to be alloced for the call, execute `sub rsp, 32+((nargs-4)*8)`
+		- add bytes back to rsp following the call
+	- Update ConstructorInfo::Invoke() accordingly

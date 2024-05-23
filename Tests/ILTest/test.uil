@@ -1,0 +1,38 @@
+public class Program:
+	public static [System]Int32 Add([System]Int32, [System]Int32):
+		ldapl 0
+		ldapl 1
+		add i32
+		ret
+
+	public static [System]Int32 Double([System]Int32):
+		ldapl 0
+		ldnc i32 2
+		mul i32
+		ret
+
+	public static [System]Int32 DoubleA([System]Int32):
+		ldapl 0
+		ldapl 0
+		add i32
+		ret
+
+
+---------------------------------------------------------------------
+public class Program
+{
+	public static int Add(int x, int y)
+	{
+		return x+y;
+	}
+
+	public static int Double(int x)
+	{
+		return x*2;
+	}
+
+	public static int DoubleA(int x)
+	{
+		reutrn x+x;
+	}
+}
