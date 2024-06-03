@@ -18,21 +18,7 @@ public class Program:
 		ret
 
 
----------------------------------------------------------------------
-public class Program
-{
-	public static int Add(int x, int y)
-	{
-		return x+y;
-	}
-
-	public static int Double(int x)
-	{
-		return x*2;
-	}
-
-	public static int DoubleA(int x)
-	{
-		reutrn x+x;
-	}
-}
+	public static [System]Int32 DelegateAndDouble([System]Int32):
+		ldapl 0
+		call []Program.DoubleA([System]Int32)
+		ret

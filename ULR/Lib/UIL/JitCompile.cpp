@@ -69,7 +69,6 @@ namespace ULR::IL
 		size_t i = 0;
 
 		std::map<byte*, MemberInfo*> replace_addrs;
-		std::vector<byte*> add_epilog;
 		std::map<MemberInfo*, std::vector<byte>> dynamic_code; // maybe make std::vector<byte>&
 
 		/* FIRST PASS - MAP OUT ASSEMBLY METADATA */
@@ -251,6 +250,7 @@ namespace ULR::IL
 					Helpers::LocalLookupTable locals;
 					Helpers::LocalLookupTable argpassedlocals;
 					unsigned int locals_size;
+					unsigned int num_eval_stack_elems;
 
 					unsigned int copy_to_rbp_offset_for_return = 0;
 
@@ -369,6 +369,8 @@ namespace ULR::IL
 								locals_size+=lcl_type->size; // todo: check if this offset is correct
 								break;
 							case Add:
+								num_eval_stack_elems-=1; // net change
+								
 								i++;
 
 								NumericalTypeIdentifier constant_type = (NumericalTypeIdentifier) il[i];
@@ -400,6 +402,8 @@ namespace ULR::IL
 
 								break;
 							case Sub: // TODO: needs fix
+								num_eval_stack_elems-=1; // net change
+
 								i++;
 
 								NumericalTypeIdentifier constant_type = (NumericalTypeIdentifier) il[i];
@@ -430,6 +434,8 @@ namespace ULR::IL
 
 								break;
 							case Mul: // needs fix
+								num_eval_stack_elems-=1; // net change
+
 								i++;
 
 								NumericalTypeIdentifier constant_type = (NumericalTypeIdentifier) il[i];
@@ -464,6 +470,8 @@ namespace ULR::IL
 
 							/* go in order */
 							case CstNC:
+								num_eval_stack_elems+=0; // net change
+
 								i++;
 
 								NumericalTypeIdentifier from_type = (NumericalTypeIdentifier) il[i];
@@ -708,12 +716,15 @@ namespace ULR::IL
 
 							/* go in order */
 							case LdStr:
+								num_eval_stack_elems+=1; // net change
+
 								i++;
 								
 								std::string_view str = LookupString(&il[i], string_ref);
 
 								i+=4; // from string lookup
 
+								// TODO: ensure GC does not activate
 								char* ulrstr = special_string_MAKE_FROM_LITERAL(str.data(), str.length());
 
 								// mov rax, ulrstr
@@ -723,6 +734,8 @@ namespace ULR::IL
 								code.push_back(0x50); // push rax
 								break;
 							case LdNC:
+								num_eval_stack_elems+=1; // net change
+
 								i++;
 
 								NumericalTypeIdentifier constant_type = (NumericalTypeIdentifier) il[i];
@@ -794,6 +807,8 @@ namespace ULR::IL
 
 								break;
 							case LdFld:
+								num_eval_stack_elems+=1; // net change
+
 								i++;
 
 								Flags binding = (Flags) il[i];
@@ -943,6 +958,8 @@ namespace ULR::IL
 								code.push_back(0x50); // push rax (push loaded field to the eval stack)
 								break;
 							case LdLoc:
+								num_eval_stack_elems+=1; // net change
+
 								i++;
 
 								byte loc_num = il[i];
@@ -971,6 +988,8 @@ namespace ULR::IL
 								}
 								break;
 							case LdAPL:
+								num_eval_stack_elems+=1; // net change
+								
 								i++;
 
 								byte apl_num = il[i];
@@ -988,7 +1007,16 @@ namespace ULR::IL
 								code.insert(code.end(), &apl.offset, &apl.offset+1);
 
 								break;
+							case Call:
+								unsigned int space_needed;
+
+
+								
+
+								break;
 							case StLoc:
+								num_eval_stack_elems-=1; // net change
+
 								i++;
 
 								byte loc_num = il[i];
@@ -1033,6 +1061,8 @@ namespace ULR::IL
 
 								break;
 							case StAPL:
+								num_eval_stack_elems-=1; // net change
+
 								i++;
 
 								byte apl_num = il[i];
@@ -1091,10 +1121,43 @@ namespace ULR::IL
 									// rax holds the addr of the thing we want to return
 									// [rbp+copy_to_rbp_offset_for_return] is the addr we must write to to actually return the value
 									// size_to_copy is the size of the value type
+
+									/*
+										mov rbx, [rbp+copy_to_rbp_offset_for_return]
+									*/
+
+									code.insert(code.end(), { 0x48, 0x8B, 0x9D });
+									code.insert(code.end(), &copy_to_rbp_offset_for_return, &copy_to_rbp_offset_for_return+1);
+
+									// now rbx holds the dest address
+
+									for (unsigned int offset = 0; offset < size_to_copy; offset+=8) // all sizes should be aligned to 8 bytes (the pointer size)
+									{
+										/*
+											mov rcx, [rax+offset]
+											mov [rbx+offset], rcx
+										*/
+
+										code.insert(code.end(), { 0x48, 0x8B, 0x88 });
+										code.insert(code.end(), &offset, &offset+1);
+
+										code.insert(code.end(), { 0x48, 0x89, 0x8B });
+										code.insert(code.end(), &offset, &offset+1);
+									}
 								}
 
-								add_epilog.push_back(&code[code.size()]);
-								code.insert(code.end(), 9, 0x0); // epilog takes 9 bytes
+								// epilog
+								// add rsp, locals_size
+								// pop rbp
+								// ret
+
+								unsigned int add_to_rsp = locals_size+(num_eval_stack_elems*8);
+
+								code.insert(code.end(), { 0x48, 0x81, 0xC4 });
+								code.insert(code.end(), &add_to_rsp, &add_to_rsp+1);
+								code.emplace_back(0x5D); // pop rbp
+								code.emplace_back(0xC3); // ret
+
 								break;
 
 							default:
@@ -1113,34 +1176,17 @@ namespace ULR::IL
 					code.insert(code.begin(), &locals_size, &locals_size+1);
 					code.insert(code.begin(), { 0x55, 0x48, 0x89, 0xE5, 0x48, 0x81, 0xEC });
 
-
 					// epilog
 					// add rsp, locals_size
 					// pop rbp
 					// ret
 
-					// 9 bytes total
+					unsigned int add_to_rsp = locals_size+(num_eval_stack_elems*8);
 
-					std::vector<byte> epilog(9);
-
-					epilog.insert(epilog.end(), { 0x48, 0x81, 0xC4 });
-					epilog.insert(epilog.end(), &locals_size, &locals_size+1);
-					epilog.emplace_back(0x5D); // pop rbp
-					epilog.emplace_back(0xC3); // ret
-
-					code.insert(code.end(), epilog.begin(), epilog.end());
-
-					if (epilog.size() != 9)
-					{
-						std::cerr << "Epilog is " << epilog.size() << " bytes (epilog.size() != 9)\n";
-						exit(1);
-					}
-
-					/* Resolve unplaced epilogs for `ret` opcodes */
-					for (const auto pos : add_epilog)
-					{
-						memcpy(pos, &epilog[0], epilog.size());
-					}
+					code.insert(code.end(), { 0x48, 0x81, 0xC4 });
+					code.insert(code.end(), &add_to_rsp, &add_to_rsp+1);
+					code.emplace_back(0x5D); // pop rbp
+					code.emplace_back(0xC3); // ret
 
 					i++;
 
@@ -1160,24 +1206,7 @@ namespace ULR::IL
 			i++;
 		}
 
-		/* THIRD PASS - RESOLVE FUNCTION AND FIELD ADDRS */
-		for (const auto& entry : replace_addrs)
-		{
-			switch (entry.second->decl_type)
-			{
-				case MemberType::Method:
-					memcpy(entry.first, &((MethodInfo*) entry.second)->offset, sizeof(void*));
-					break;
-				case MemberType::Field:
-					memcpy(entry.first, &((FieldInfo*) entry.second)->offset, sizeof(void*));
- 					break;
-				case MemberType::Ctor:
-					memcpy(entry.first, &((ConstructorInfo*) entry.second)->offset, sizeof(void*));
-					break;
-			}
-		}
-
-		/* FINISH COMPILATION - COPY BYTES OVER */
+		/* THIRD PASS - COPY BYTES OVER */
 		for (auto& entry : dynamic_code)
 		{
 			void* offset;
@@ -1200,6 +1229,23 @@ namespace ULR::IL
 
 			memcpy(offset, &entry.second[0], func_size);
 			VirtualProtect(offset, func_size, PAGE_EXECUTE_READ, &discard);
+		}
+
+		/* THIRD PASS - RESOLVE FUNCTION AND FIELD ADDRS */
+		for (const auto& entry : replace_addrs)
+		{
+			switch (entry.second->decl_type)
+			{
+				case MemberType::Method:
+					memcpy(entry.first, &((MethodInfo*) entry.second)->offset, sizeof(void*));
+					break;
+				case MemberType::Field:
+					memcpy(entry.first, &((FieldInfo*) entry.second)->offset, sizeof(void*));
+ 					break;
+				case MemberType::Ctor:
+					memcpy(entry.first, &((ConstructorInfo*) entry.second)->offset, sizeof(void*));
+					break;
+			}
 		}
 
 		return NoError;
