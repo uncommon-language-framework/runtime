@@ -39,7 +39,9 @@ sizeof_ns1_System_Int32 overload0_ns0_Program_Main(char* argv)
 	uint16_t arg2_strref_offset = 42;
 	uint16_t arg2_strref_len = 13;
 
-	uint32_t method_size = 7; // TODO
+	uint32_t method_size = 15; // TODO
+
+	int32_t int_to_use_in_il = 2;
 
 	Modifiers static_modifiers = (Modifiers) (Modifiers::Private | Modifiers::Static);
 
@@ -57,16 +59,21 @@ sizeof_ns1_System_Int32 overload0_ns0_Program_Main(char* argv)
 		PlaceShort(static_modifiers), // private, static
 		PlaceShort(rettype_strref_offset), PlaceShort(rettype_strref_len), // return type strref
 		PlaceLong(method_size),
+		OpCodes::NewArg,
 		PlaceShort(arg1_strref_offset), PlaceShort(arg1_strref_len), // first arg type
+		OpCodes::NewArg,
 		PlaceShort(arg2_strref_offset), PlaceShort(arg2_strref_len), // second arg type
-		OpCodes::EndSection, // end method signature
+		// end method signature
 
 		// BEGIN METHOD BODY
 		OpCodes::LdAPL, 0, // ldapl 0
 		OpCodes::LdAPL, 1, // ldapl 1
 		OpCodes::Add, NumericalTypeIdentifier::Int32, // add i32
+		OpCodes::LdNC, NumericalTypeIdentifier::Int32, PlaceLong(int_to_use_in_il), //  ldnc i32 2
+		OpCodes::Mul, NumericalTypeIdentifier::Int32, // mul i32
 		OpCodes::Ret, // ret
 		OpCodes::EndMethod, // END METHOD BODY
+
 		OpCodes::EndType,
 		OpCodes::EndAssembly
 	};
@@ -88,7 +95,9 @@ sizeof_ns1_System_Int32 overload0_ns0_Program_Main(char* argv)
 			<< (void*) error.byte_at
 			<< "] (il["
 			<< (size_t) (error.byte_at-il)
-			<< "])\n";
+			<< "]) value: "
+			<< (int) *error.byte_at
+			<< '\n';
 
 		return 1;
 	}
@@ -101,12 +110,7 @@ sizeof_ns1_System_Int32 overload0_ns0_Program_Main(char* argv)
 	Type* MyType = internal_api->GetType("[MyNamespace]MyClass", "JitAssembly");
 
 	TEST(MyType, 1);
-
-	for (const auto& entry : MyType->static_attrs)
-	{
-		std::cout << "Member: " << entry.first << '\n';
-	}
-
+	
 	MethodInfo* func = internal_api->GetMethod(
 		MyType,
 		"MyMethod", { SystemInt32, SystemInt32 },
@@ -117,7 +121,7 @@ sizeof_ns1_System_Int32 overload0_ns0_Program_Main(char* argv)
 
 	std::cout << func->offset << '\n';
 
-	char* boxedres = func->Invoke(
+	char* boxedres = func->Invoke( // reflection call
 		nullptr,
 		{ internal_api->Box(x, SystemInt32), internal_api->Box(y, SystemInt32) }
 	);
@@ -126,7 +130,13 @@ sizeof_ns1_System_Int32 overload0_ns0_Program_Main(char* argv)
 
 	int res = internal_api->UnBox<sizeof_ns1_System_Int32>(boxedres);
 	
-	TEST(res == 5, 4); // 1+4 == 5
+	TEST(res == 10, 4); // (1+4)*2 == 10
+
+	// non-reflection call
+
+	int (*perimeter)(int length, int width) = (int (*)(int, int)) func->offset;
+
+	TEST(perimeter(1, 4) == 10, 5);
 
 	return 0;
 }

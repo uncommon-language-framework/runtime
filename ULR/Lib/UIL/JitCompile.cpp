@@ -56,6 +56,7 @@ namespace ULR::IL
 	}
 
 	// TODO: add support for ctors and dtors
+	// TODO: make sure JIT aligns all pointers to eight bytes OR think of a better soln
 	// TODO: add support for generic IL
 	// TODO: add support for float operations (within the switch case statements)
 	// TODO: ensure that evaluation stack is clear before returning (just use a counter var and add necessary bytes to rsp in epilogs)
@@ -158,18 +159,19 @@ namespace ULR::IL
 					i+=4; // skip four bytes of method size
 
 					// method args
-					while (il[i] != OpCodes::EndSection)
+					while (il[i] == OpCodes::NewArg)
 					{
+						i++; // skip newarg signal
+
 						i+=4; // skip what would be a string lookup for typename
 					}
-
-					i++; // skip EndSection opcode
 
 					// end method arg lookup
 
 					i+=method_size;
 
-					i+=1; // skip EndMethod OpCode, TODO: check if this is actually EndMethod and if not, throw err
+					i++; // skip EndMethod OpCode, TODO: check if this is actually EndMethod and if not, throw err
+
 
 					if (attrs & Modifiers::Static)
 					{
@@ -327,8 +329,10 @@ namespace ULR::IL
 					}
 
 					// method args
-					while (il[i] != OpCodes::EndSection)
+					while (il[i] == OpCodes::NewArg)
 					{
+						i++; // skip newarg signal
+
 						std::string argname = std::string(LookupString(&il[i], string_ref));
 
 						i+=4; // skip four for argtype stringref
@@ -368,8 +372,6 @@ namespace ULR::IL
 						}
 					}
 
-					i++; // skip EndSection opcode
-
 					// end get method args
 
 					if (copy_to_rbp_offset_for_return)
@@ -388,7 +390,6 @@ namespace ULR::IL
 							case LocalDecl:
 								i++;
 								{
-								
 									Type* lcl_type = api->GetType(std::string(LookupString(&il[i], string_ref)).data());
 									size_t lcl_store_size = IsBoxableStruct(lcl_type) ? lcl_type->size : 8; 
 
@@ -441,7 +442,6 @@ namespace ULR::IL
 								i++;
 
 								{
-
 									NumericalTypeIdentifier constant_type = (NumericalTypeIdentifier) il[i];
 
 									i++;
@@ -474,11 +474,13 @@ namespace ULR::IL
 								num_eval_stack_elems-=1; // net change
 
 								i++;
-								
+
 								{
 									NumericalTypeIdentifier constant_type = (NumericalTypeIdentifier) il[i];
 
 									i++;
+
+									code.push_back(0x58); // pop rax
 
 									switch (constant_type)
 									{
@@ -488,22 +490,132 @@ namespace ULR::IL
 										case UInt16:
 										case Int32:
 										case UInt32:
-											code.insert(code.end(), { 0x29, 0x04, 0x24 }); // sub [rsp], eax
+											/*
+												imul eax, [rsp]
+												mov [rsp], rax
+											*/
+											code.insert(code.end(), { 0x0F, 0xAF, 0x04, 0x24, 0x48, 0x89, 0x04, 0x24 });
 
 											break;
 										case Int64:
 										case UInt64:
-											code.insert(code.end(), { 0x48, 0x29, 0x04, 0x24 }); // sub [rsp], rax
+											/*
+												imul rax, rax
+												mov [rsp], rax
+											*/
+											code.insert(code.end(), { 0x48, 0x0F, 0xAF, 0xC0, 0x48, 0x89, 0x04, 0x24 });
 
 											break;																													
 										default:
 											return { "Invalid numerical type identifier", CompilationError::ErrorCode::InvalidTypeIdentifer, &il[i]};
 									}
+									
+									break;
+								}
+							case Div: // needs fix
+								num_eval_stack_elems-=1; // net change
 
-									code.push_back(0x58); // pop rax
-									code.push_back(0x5D); // pop rbp
-									code.insert(code.end(), { 0x48, 0xF7, 0xE5 }); // mul rbp
-									code.push_back(0x50); // push rax
+								i++;
+
+								{
+									NumericalTypeIdentifier constant_type = (NumericalTypeIdentifier) il[i];
+
+									i++;
+
+									code.push_back(0x59); // pop rcx [divisor]
+									code.push_back(0x58); // pop rax [dividend]
+									code.insert(code.end(), { 0x48, 0x31, 0xD2 }); // xor rdx, rdx
+
+									switch (constant_type) // TODO: see if division can be done with 16 bit registers
+									{
+										case Int8:
+											/*
+												movsx eax, al
+												movsx ecx, cl
+												cdq
+												idiv ecx,
+												movzx ax, al
+												push ax
+										
+											*/
+											code.insert(code.end(), { 0x0F, 0xBE, 0xC0, 0x0F, 0xBE, 0xC9, 0x99, 0xF7, 0xF9, 0x66, 0x0F, 0xB6, 0xC0, 0x66, 0x50 });
+											break;
+										case UInt8:
+											/*
+												xor edx, edx
+												div ecx,
+												movzx ax, al
+												push ax
+											*/
+
+											code.insert(code.end(), { 0x31, 0xD2, 0xF7, 0xF1, 0x66, 0x0F, 0xB6, 0xC0, 0x66, 0x50 });
+											break;
+										case Int16:
+											/*
+												movsx eax, ax
+												movsx ecx, cx
+												cdq
+												idiv ecx
+												push ax
+
+											*/
+
+											code.insert(code.end(), { 0x0F, 0xBF, 0xC0, 0x0F, 0xBF, 0xC9, 0x99, 0xF7, 0xF9, 0x50, 0x66, 0x50 });
+
+											break;
+										case UInt16:
+											/*
+												xor edx, edx
+												div ecx
+												push ax
+											*/
+
+											code.insert(code.end(), { 0x31, 0xD2, 0xF7, 0xF1, 0x66, 0x50 });
+
+											break;
+
+										case Int32:
+											/*
+												cdq
+												idiv ecx
+												push rax
+											*/
+
+											code.insert(code.end(), { 0x99, 0xF7, 0xF9, 0x50 });
+											break;
+										case Int64:
+											/*
+												cqo
+												idiv rcx
+												push rax
+											*/
+
+											code.insert(code.end(), { 0x48, 0x99, 0x48, 0xF7, 0xF9, 0x50 });
+											
+											break;
+
+										case UInt32:
+											/*
+												xor edx, edx
+												div ecx
+												push rax
+											*/
+
+											code.insert(code.end(), { 0x31, 0xD2, 0xF7, 0xF1, 0x50 });
+										case UInt64:
+											/*
+												xor rdx, rdx
+												div rcx
+												push rax
+											*/
+
+											code.insert(code.end(), { 0x48, 0x31, 0xD2, 0x48, 0xF7, 0xF1, 0x50 });
+
+											break;																													
+										default:
+											return { "Invalid numerical type identifier", CompilationError::ErrorCode::InvalidTypeIdentifer, &il[i]};
+									}
+									
 									break;
 								}
 
@@ -808,7 +920,7 @@ namespace ULR::IL
 										case Int16: // falls into next case
 										case UInt16:
 											{
-												uint32_t num = *(uint16_t*) il; // we store it as a uint32 because the push instr doesn't take 16-bit only vals; this is probably faster than zero-extending ax and then pushing it anyway
+												uint32_t num = *(uint16_t*) &il[i]; // we store it as a uint32 because the push instr doesn't take 16-bit only vals; this is probably faster than zero-extending ax and then pushing it anyway
 
 												i+=2;
 
@@ -823,7 +935,7 @@ namespace ULR::IL
 										case Int32: // falls into next case
 										case UInt32:
 											{
-												uint32_t num = *(uint32_t*) il;
+												uint32_t num = *(uint32_t*) &il[i];
 												
 												i+=4;
 
@@ -838,7 +950,7 @@ namespace ULR::IL
 										case Int64:
 										case UInt64:
 											{
-												uint64_t num = *(uint64_t*) il;
+												uint64_t num = *(uint64_t*) &il[i];
 												
 												i+=8;
 

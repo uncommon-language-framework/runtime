@@ -40,6 +40,8 @@ namespace ULR::IL
 		Sub,
 		Mul,
 		Div,
+		Mod,
+		DivMod,
 		AddF,
 		SubF,
 		MulF,
@@ -80,6 +82,7 @@ namespace ULR::IL
 		BeginSection,
 		EndSection,
 		EndAssembly,
+		NewArg,
 
 		FieldDecl,
 		LocalDecl,
