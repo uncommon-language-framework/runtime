@@ -1194,25 +1194,25 @@ namespace ULR::IL
 									// size_to_copy is the size of the value type
 
 									/*
-										mov rbx, [rbp+copy_to_rbp_offset_for_return]
+										mov rcx, [rbp+copy_to_rbp_offset_for_return]
 									*/
 
-									code.insert(code.end(), { 0x48, 0x8B, 0x9D });
+									code.insert(code.end(), { 0x48, 0x8B, 0x8D });
 									code.insert(code.end(), (byte*) &copy_to_rbp_offset_for_return, ((byte*) &copy_to_rbp_offset_for_return)+sizeof(uint32_t));
 
-									// now rbx holds the dest address
+									// now rcx holds the dest address
 
 									for (unsigned int offset = 0; offset < size_to_copy; offset+=8) // all sizes should be aligned to 8 bytes (the pointer size)
 									{
 										/*
-											mov rcx, [rax+offset]
-											mov [rbx+offset], rcx
+											mov rdx, [rax+offset]
+											mov [rcx+offset], rdx
 										*/
 
-										code.insert(code.end(), { 0x48, 0x8B, 0x88 });
+										code.insert(code.end(), { 0x48, 0x8B, 0x90 });
 										code.insert(code.end(), (byte*) &offset, ((byte*) &offset)+sizeof(uint32_t));
 
-										code.insert(code.end(), { 0x48, 0x89, 0x8B });
+										code.insert(code.end(), { 0x48, 0x89, 0x91 });
 										code.insert(code.end(), (byte*) &offset, ((byte*) &offset)+sizeof(uint32_t));
 									}
 								}
