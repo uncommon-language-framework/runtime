@@ -53,7 +53,7 @@ namespace ULR
 				if ((IsFriendlyStructSizex64(lclsig[i])) && !(!is_static && i == 0))
 				{
 					// maybe because of padding endianness won't matter?
-					unboxedargs[i] = *((void**) ((Type**) args[i])+1); // unbox arg and use value
+					unboxedargs[i] = *((void**) (((Type**) args[i])+1)); // unbox arg and use value
 					continue;
 				}
 

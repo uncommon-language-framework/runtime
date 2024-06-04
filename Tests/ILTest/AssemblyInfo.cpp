@@ -8,7 +8,7 @@ using namespace ULR::IL;
 
 BEGIN_ULR_EXPORT
 
-#define ByteOf(num, n) ((byte*) num)[n]
+#define ByteOf(num, n) ((byte*) &num)[n]
 #define PlaceShort(num) ByteOf(num, 0), ByteOf(num, 1)
 #define PlaceLong(num) ByteOf(num, 0), ByteOf(num, 1), ByteOf(num, 2), ByteOf(num, 3)
 
@@ -39,7 +39,7 @@ sizeof_ns1_System_Int32 overload0_ns0_Program_Main(char* argv)
 	uint16_t arg2_strref_offset = 42;
 	uint16_t arg2_strref_len = 13;
 
-	uint32_t method_size = 0; // TODO
+	uint32_t method_size = 7; // TODO
 
 	Modifiers static_modifiers = (Modifiers) (Modifiers::Private | Modifiers::Static);
 
@@ -50,7 +50,7 @@ sizeof_ns1_System_Int32 overload0_ns0_Program_Main(char* argv)
 		PlaceLong(size), // size (filled later)
 		0, 0, PlaceShort(name_strref_size), // string ref
 		PlaceShort(name_strref_size), PlaceShort(base_strref_size), // base string ref
-		OpCodes::EndTypeMeta,
+		OpCodes::EndTypeMeta, // no interfaces, just end meta here
 		OpCodes::BeginMethod,
 		0, // overload number
 		PlaceShort(methodname_strref_offset), PlaceShort(methodname_strref_size), // method name string ref
@@ -77,6 +77,8 @@ sizeof_ns1_System_Int32 overload0_ns0_Program_Main(char* argv)
 
 	auto error = jit.Compile(jitasm, il, string_ref);
 
+	TEST(1, 0);
+
 	if (error)
 	{
 		std::cerr
@@ -85,7 +87,7 @@ sizeof_ns1_System_Int32 overload0_ns0_Program_Main(char* argv)
 			<< " at byte ["
 			<< (void*) error.byte_at
 			<< "] (il["
-			<< (void*) (error.byte_at-il)
+			<< (size_t) (error.byte_at-il)
 			<< "])\n";
 
 		return 1;
@@ -96,20 +98,35 @@ sizeof_ns1_System_Int32 overload0_ns0_Program_Main(char* argv)
 
 	Type* SystemInt32 = internal_api->GetType("[System]Int32", "System.Runtime.Native.dll");
 
+	Type* MyType = internal_api->GetType("[MyNamespace]MyClass", "JitAssembly");
+
+	TEST(MyType, 1);
+
+	for (const auto& entry : MyType->static_attrs)
+	{
+		std::cout << "Member: " << entry.first << '\n';
+	}
+
 	MethodInfo* func = internal_api->GetMethod(
-		internal_api->GetType("[MyNamespace]MyClass", "JitAssembly"),
+		MyType,
 		"MyMethod", { SystemInt32, SystemInt32 },
-		BindingFlags::Static || BindingFlags::NonPublic
+		BindingFlags::Static | BindingFlags::NonPublic
 	);
 
-	int res = internal_api->UnBox<sizeof_ns1_System_Int32>(
-		func->Invoke(
-			nullptr,
-			{ internal_api->Box(x, SystemInt32), internal_api->Box(y, SystemInt32) }
-		)
+	TEST(func, 2);
+
+	std::cout << func->offset << '\n';
+
+	char* boxedres = func->Invoke(
+		nullptr,
+		{ internal_api->Box(x, SystemInt32), internal_api->Box(y, SystemInt32) }
 	);
 
-	TEST(res == 5, 0); // 1+4 = 5
+	TEST(boxedres, 3);
+
+	int res = internal_api->UnBox<sizeof_ns1_System_Int32>(boxedres);
+	
+	TEST(res == 5, 4); // 1+4 == 5
 
 	return 0;
 }

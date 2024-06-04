@@ -94,7 +94,7 @@ if  ($args[2] -ne "libonly")
 		
 		Move-Item *.o ObjCache/DbgObj -Force
 
-		g++64 "ObjCache/DbgObj/ulrhost.o" "ULR.NativeLib.dll" "ObjCache/DbgObj/Loader.o" -o ulrhost.exe -masm=intel -Wno-write-strings -lstdc++fs -std=c++17 -ldbghelp
+		g++64 "ObjCache/DbgObj/ulrhost.o" "ULR.NativeLib.dll" "ObjCache/DbgObj/Loader.o" -o ulrhost.exe -masm=intel -Wno-write-strings -std=c++17 -ldbghelp
 	}
 	else
 	{

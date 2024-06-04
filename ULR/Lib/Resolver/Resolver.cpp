@@ -2,7 +2,6 @@
 #include <dbghelp.h>
 #include <winternl.h>
 #include <sstream>
-#include <llvm/Support/TargetSelect.h>
 
 #define COLOR_INTEGER "\u001b[1m" // bold actually
 #define COLOR_TYPE_GREEN "\u001b[92m"
@@ -34,10 +33,6 @@ namespace ULR::Resolver
 		this->LoadAssemblyPtr = LoadAssembly;
 		this->ReadAssemblyPtr = ReadAssembly;
 		this->PopulateVtablePtr = PopulateVtable;
-
-		llvm::InitializeNativeTarget();
-
-		this->jit = llvm::cantFail(llvm::orc::LLJITBuilder().create());
 
 		if (debugger)
 		{
@@ -142,9 +137,9 @@ namespace ULR::Resolver
 	{
 		if ((bindingflags & BindingFlags::Instance) && (type->inst_attrs.count(name)))
 		{
-			for (auto& member : type->inst_attrs[name])
+			for (const auto member : type->inst_attrs[name])
 			{
-				if (member->decl_type & MemberType::Method)
+				if (member->decl_type == MemberType::Method)
 				{
 					MethodInfo* casted = (MethodInfo*) member;
 
@@ -152,7 +147,7 @@ namespace ULR::Resolver
 					{
 						if (member->attrs & Modifiers::Public)
 						{
-							if(bindingflags & BindingFlags::Public) return casted;
+							if (bindingflags & BindingFlags::Public) return casted;
 						}
 						else if (bindingflags & BindingFlags::NonPublic) return casted;
 					}
@@ -162,9 +157,9 @@ namespace ULR::Resolver
 
 		if ((bindingflags & BindingFlags::Static) && (type->static_attrs.count(name)))
 		{
-			for (auto& member : type->static_attrs[name])
+			for (const auto member : type->static_attrs[name])
 			{
-				if (member->decl_type & MemberType::Method)
+				if (member->decl_type == MemberType::Method)
 				{
 					MethodInfo* casted = (MethodInfo*) member;
 
@@ -172,7 +167,7 @@ namespace ULR::Resolver
 					{
 						if (member->attrs & Modifiers::Public)
 						{
-							if(bindingflags & BindingFlags::Public) return casted;
+							if (bindingflags & BindingFlags::Public) return casted;
 						}
 						else if (bindingflags & BindingFlags::NonPublic) return casted;
 					}
@@ -189,9 +184,9 @@ namespace ULR::Resolver
 	{
 		if ((bindingflags & BindingFlags::Instance) && (type->inst_attrs.count(name)))
 		{
-			for (auto& member : type->inst_attrs[name])
+			for (const auto member : type->inst_attrs[name])
 			{
-				if (member->decl_type & MemberType::Method)
+				if (member->decl_type == MemberType::Method)
 				{
 					MethodInfo* casted = (MethodInfo*) member;
 
@@ -211,9 +206,9 @@ namespace ULR::Resolver
 
 		if ((bindingflags & BindingFlags::Static) && (type->static_attrs.count(name)))
 		{
-			for (auto& member : type->static_attrs[name])
+			for (const auto member : type->static_attrs[name])
 			{
-				if (member->decl_type & MemberType::Method)
+				if (member->decl_type == MemberType::Method)
 				{
 					MethodInfo* casted = (MethodInfo*) member;
 
@@ -240,9 +235,9 @@ namespace ULR::Resolver
 	{
 		if ((bindingflags & BindingFlags::Instance) && (type->inst_attrs.count(name)))
 		{
-			for (auto& member : type->inst_attrs[name])
+			for (const auto member : type->inst_attrs[name])
 			{
-				if (member->decl_type & MemberType::Field)
+				if (member->decl_type == MemberType::Field)
 				{
 					if (member->attrs & Modifiers::Public && bindingflags & BindingFlags::Public) return (FieldInfo*) member;
 					if (bindingflags & BindingFlags::NonPublic) return (FieldInfo*) member;
@@ -252,9 +247,9 @@ namespace ULR::Resolver
 
 		if ((bindingflags & BindingFlags::Static) && (type->static_attrs.count(name)))
 		{
-			for (auto& member : type->static_attrs[name])
+			for (const auto member : type->static_attrs[name])
 			{
-				if (member->decl_type & MemberType::Field)
+				if (member->decl_type == MemberType::Field)
 				{
 					if (member->attrs & Modifiers::Public && bindingflags & BindingFlags::Public) return (FieldInfo*) member;
 					if (bindingflags & BindingFlags::NonPublic) return (FieldInfo*) member;
@@ -271,9 +266,9 @@ namespace ULR::Resolver
 	{
 		if ((bindingflags & BindingFlags::Instance) && (type->inst_attrs.count(name)))
 		{
-			for (auto& member : type->inst_attrs[name])
+			for (const auto member : type->inst_attrs[name])
 			{
-				if (member->decl_type & MemberType::Property)
+				if (member->decl_type == MemberType::Property)
 				{
 					if (member->attrs & Modifiers::Public && bindingflags & BindingFlags::Public) return (PropertyInfo*) member;
 					if (bindingflags & BindingFlags::NonPublic) return (PropertyInfo*) member;
@@ -283,9 +278,9 @@ namespace ULR::Resolver
 
 		if ((bindingflags & BindingFlags::Static) && (type->static_attrs.count(name)))
 		{
-			for (auto& member : type->static_attrs[name])
+			for (const auto member : type->static_attrs[name])
 			{
-				if (member->decl_type & MemberType::Property)
+				if (member->decl_type == MemberType::Property)
 				{
 					if (member->attrs & Modifiers::Public && bindingflags & BindingFlags::Public) return (PropertyInfo*) member;
 					if (bindingflags & BindingFlags::NonPublic) return (PropertyInfo*) member;
@@ -717,27 +712,27 @@ namespace ULR::Resolver
 		{
 			for (auto& type_entry : entry.second->types)
 			{
-				for (auto& member_entry : type_entry.second->inst_attrs)
+				for (const auto member_entry : type_entry.second->inst_attrs)
 				{
 					if (
 						member_entry.second[0]->decl_type == MemberType::Field ||
 						member_entry.second[0]->decl_type == MemberType::Property)
 							continue;
 					
-					for (auto& member : member_entry.second)
+					for (const auto member : member_entry.second)
 					{
 						if (member->decl_type == MemberType::Method && ((MethodInfo*) member)->offset == addr) return member;
 					}
 				}
 
-				for (auto& member_entry : type_entry.second->static_attrs)
+				for (const auto member_entry : type_entry.second->static_attrs)
 				{
 					if (
 						member_entry.second[0]->decl_type == MemberType::Field ||
 						member_entry.second[0]->decl_type == MemberType::Property)
 							continue;
 					
-					for (auto& member : member_entry.second)
+					for (const auto member : member_entry.second)
 					{
 						if (member->decl_type == MemberType::Method && ((MethodInfo*) member)->offset == addr) return member;
 						if (member->decl_type == MemberType::Ctor && ((ConstructorInfo*) member)->offset == addr) return member;

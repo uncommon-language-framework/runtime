@@ -67,7 +67,7 @@ int main(int argc, char* argv[])
 
 	internal_api = &lclapi;
 
-	Assembly* ArrayTypeAssembly = new Assembly(strdup("ULR.<ArrayTypes>"), "", "", 0, { }, { nullptr }, (HMODULE) nullptr);
+	Assembly* ArrayTypeAssembly = new Assembly(strdup("ULR.<ArrayTypes>"), strdup(""), "", 0, { }, { nullptr }, (HMODULE) nullptr);
 	Loader::ReadAssemblies[ArrayTypeAssembly->name] = ArrayTypeAssembly;
 	Loader::LoadedAssemblies[ArrayTypeAssembly->name] = ArrayTypeAssembly;
 	

@@ -5,7 +5,6 @@
 #include <set>
 #include <thread>
 #include <mutex>
-#include <llvm/ExecutionEngine/Orc/LLJIT.h>
 
 #pragma once
 
@@ -41,7 +40,6 @@ namespace ULR::Resolver
 	{
 		Assembly* (*LoadAssemblyPtr)(char name[], ULRAPIImpl* api);
 		HMODULE (*ReadAssemblyPtr)(char name[]);
-		void (*PopulateVtablePtr)(Type* type);
 		void (*StaticDebug)(StaticDebugInfo& info);
 
 		size_t prev_size_accessible = 0;
@@ -53,9 +51,9 @@ namespace ULR::Resolver
 
 		public:
 			GCResult last_gc_result;
+			void (*PopulateVtablePtr)(Type* type);
 			std::map<char*, size_t> allocated_objs;
 			size_t allocated_size = 0;
-			std::unique_ptr<llvm::orc::LLJIT> jit;
 			std::vector<void*> allocated_field_offsets;
 			std::map<char*, Assembly*, cmp_chr_ptr>* assemblies;
 			std::map<char*, Assembly*, cmp_chr_ptr>* read_assemblies;
@@ -123,7 +121,10 @@ namespace ULR::Resolver
 			template <typename ValueType>
 			char* Box(ValueType& obj, Type* typeptr)
 			{
-				Type** boxed = (Type**) AllocateObject(sizeof(Type*)+sizeof(ValueType));
+				size_t base_size = sizeof(Type*)+sizeof(ValueType); // now pad size to nearest 8 bytes
+				size_t alloc_size = base_size+(8-(base_size % 8));
+
+				Type** boxed = (Type**) AllocateObject(alloc_size);
 
 				boxed[0] = typeptr;
 				

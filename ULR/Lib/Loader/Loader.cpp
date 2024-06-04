@@ -6,7 +6,6 @@
 #include <map>
 #include <unordered_map>
 #include <vector>
-#include <filesystem>
 
 using ULR::Resolver::BindingFlags;
 
@@ -43,7 +42,9 @@ namespace ULR::Loader
 
 		std::string as_str = dll;
 		char* asm_basename = strdup(as_str.substr(as_str.find_last_of("/\\") + 1).c_str());
-		char* asm_fullpath = strdup(std::filesystem::absolute(dll).string().c_str());
+		
+		// std::string fullpathstr = std::filesystem::absolute(dll).string();
+		char* asm_fullpath = strdup(dll); // TODO: get abs path in the future
 
 		Assembly* assembly = new Assembly(
 			asm_basename,
