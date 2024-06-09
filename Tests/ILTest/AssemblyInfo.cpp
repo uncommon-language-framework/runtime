@@ -39,7 +39,7 @@ sizeof_ns1_System_Int32 overload0_ns0_Program_Main(char* argv)
 	uint16_t arg2_strref_offset = 42;
 	uint16_t arg2_strref_len = 13;
 
-	uint32_t method_size = 15; // TODO
+	uint32_t method_size = 16;
 
 	int32_t int_to_use_in_il = 2;
 
@@ -64,6 +64,8 @@ sizeof_ns1_System_Int32 overload0_ns0_Program_Main(char* argv)
 		OpCodes::NewArg,
 		PlaceShort(arg2_strref_offset), PlaceShort(arg2_strref_len), // second arg type
 		// end method signature
+
+		OpCodes::BeginSection, // no locals, so just go ahead and begin the section
 
 		// BEGIN METHOD BODY
 		OpCodes::LdAPL, 0, // ldapl 0

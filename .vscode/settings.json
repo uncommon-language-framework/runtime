@@ -73,6 +73,7 @@
 		"variant": "cpp",
 		"iomanip": "cpp",
 		"*.def": "cpp",
-		"filesystem": "cpp"
+		"filesystem": "cpp",
+		"stack": "cpp"
 	}
 }

@@ -121,8 +121,7 @@ namespace ULR::Resolver
 			template <typename ValueType>
 			char* Box(ValueType& obj, Type* typeptr)
 			{
-				size_t base_size = sizeof(Type*)+sizeof(ValueType); // now pad size to nearest 8 bytes
-				size_t alloc_size = base_size+(8-(base_size % 8));
+				size_t alloc_size = sizeof(Type*)+std::max(sizeof(ValueType), sizeof(intptr_t)); // if size < ptr_size, extend (pad) to at least ptr_size bytes (8 for x64 impl)
 
 				Type** boxed = (Type**) AllocateObject(alloc_size);
 

@@ -1,0 +1,20 @@
+public class Program:
+	public static [System]Int32 Main([System]String):
+		.local [System]String[]
+		.local [System]Int32
+		.local [System]Int32
+
+		ldloc 1
+		ldloc 2
+		jne cont1
+		.section loop1
+			ldnc i32 5
+			stloc 1
+
+			ldloc 1
+			ldloc 2
+			jeq loop1
+
+		.section cont1
+
+		ret

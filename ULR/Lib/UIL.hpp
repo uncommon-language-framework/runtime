@@ -1,4 +1,5 @@
 #include "Resolver.hpp"
+#include <stack>
 
 #pragma once
 
@@ -6,10 +7,41 @@
 #error "No UIL JIT support for non-windows x64 platforms currently"
 #endif
 
-using byte = unsigned char;
+
 
 namespace ULR::IL
 {
+	using byte = unsigned char;
+	
+	namespace Helpers
+	{
+		class StackValueExpression
+		{
+			enum ExpressionType
+			{
+				StringLiteral,
+				IntegerConstant,
+				FloatConstant,
+				FieldLookup,
+				FuncRetValue,
+				LocalLookup,
+				ArrayLookup
+			};
+
+			ExpressionType expr_type;
+		};
+
+		using EvalStack = std::stack<StackValueExpression>;
+
+		struct LocalInfo
+		{
+			int offset;
+			size_t size;
+		};
+
+		using LocalLookupTable = std::vector<LocalInfo>;		
+	}
+
 	struct CompilationError
 	{
 		enum ErrorCode
@@ -19,7 +51,9 @@ namespace ULR::IL
 			MemberExpected,
 			InvalidInstr,
 			LocalTypeExpected,
-			InvalidTypeIdentifer		
+			InvalidTypeIdentifer,
+			InvalidDirective,
+			SignalExpected
 		};
 
 		char* error;
@@ -42,10 +76,6 @@ namespace ULR::IL
 		Div,
 		Mod,
 		DivMod,
-		AddF,
-		SubF,
-		MulF,
-		DivF,
 		And,
 		Or,
 		Not,
@@ -69,7 +99,21 @@ namespace ULR::IL
 		New,
 		NewArr,
 		Ret,
-		If,
+		
+		/* Jumping Instructions */
+		Jmp,
+		JNE,
+		JEq,
+		JLT,
+		JGT,
+		JLU,
+		JGU,
+		JLE,
+		JGE,
+		JLEU,
+		JGEU,
+		JTr,
+		JFl,
 
 		/* Below are UIL signals, used to section code */
 		BeginType,
@@ -80,7 +124,6 @@ namespace ULR::IL
 		BeginDtor,
 		EndMethod,
 		BeginSection,
-		EndSection,
 		EndAssembly,
 		NewArg,
 
@@ -116,7 +159,8 @@ namespace ULR::IL
 		std::vector<void*> virt_alloced;
 		std::vector<void*> malloc_alloced;
 		Resolver::ULRAPIImpl* api;
-		
+		char* (*special_string_MAKE_FROM_LITERAL)(const char*, int);
+
 		public:
 			JITContext(Resolver::ULRAPIImpl* api);
 			/*
@@ -134,6 +178,30 @@ namespace ULR::IL
 			NOTE: meta_asm MUST be added to the current ULRAPI instance's records before jitting.
 			*/
 			CompilationError StackBaseCompile(Assembly* meta_asm, byte il[], byte string_ref[]);
+			
+			CompilationError ReadTypeMeta(Assembly* meta_asm, size_t& i, byte il[], byte string_ref[]);
+			CompilationError CompileType(
+				Assembly* meta_asm,
+				std::map<byte*, MemberInfo*>& replace_addrs,
+				std::map<MemberInfo*, std::vector<byte>>& dynamic_code,
+				size_t& i, byte il[], byte string_ref[]
+			);
+			CompilationError CompileGenericType(Assembly* meta_asm, size_t& i, byte il[], byte string_ref[], Type* (*ResolveGenericLookup)(byte));
+			
+			CompilationError CompileSection(
+				unsigned int locals_size,
+				unsigned int copy_to_rbp_offset_for_return,
+				Type* rettype,
+				std::map<byte*, MemberInfo*>& replace_addrs,
+				Helpers::LocalLookupTable& locals,
+				Helpers::LocalLookupTable& apls,
+				std::vector<byte>& code, size_t& i,
+				byte il[],
+				byte string_ref[]
+			);
+			CompilationError CompileGenericScope(std::vector<byte>& code, size_t& i, byte il[], byte string_ref[], Type* (*ResolveGenericLookup)(byte));
+			CompilationError CompleteCompilation(std::map<byte*, MemberInfo*>& replace_addrs, std::map<MemberInfo*, std::vector<byte>>& dynamic_code);
+			
 			~JITContext();
 
 		private:
