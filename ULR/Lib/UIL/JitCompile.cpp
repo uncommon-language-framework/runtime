@@ -5,22 +5,6 @@
 
 namespace ULR::IL
 {
-	JITContext::JITContext(Resolver::ULRAPIImpl* api)
-	{
-		this->api = api;
-		this->special_string_MAKE_FROM_LITERAL = (char* (*)(const char*, int)) api->LocateSymbol(api->LocateAssembly("System.Runtime.Native.dll"), "special_string_MAKE_FROM_LITERAL");
-	}
-
-	std::string_view JITContext::LookupString(byte il_of_string_ref[], byte string_ref[]) // every string reference takes four bytes - two to specify the offset from string_ref and two to specify the length of the string
-	{
-		static_assert((sizeof(char) == 1) && (sizeof(char) == sizeof(byte)));
-
-		uint16_t offset = *((uint16_t*) il_of_string_ref);
-		uint16_t length = *(((uint16_t*) il_of_string_ref)+1);
-
-		return std::string_view(((char*) string_ref)+offset, length);
-	}
-
 	CompilationError JITContext::Compile(Assembly* meta_asm, byte il[], byte string_ref[])
 	{
 		return StackBaseCompile(meta_asm, il, string_ref);
@@ -138,24 +122,5 @@ namespace ULR::IL
 		}
 
 		return NoError;
-	}
-
-	JITContext::~JITContext()
-	{
-		for (const auto alloced : virt_alloced)
-		{
-			#ifdef _WIN64
-				VirtualFree(alloced, 0, MEM_RELEASE);
-			#else
-
-			#error "No UIL JIT support for non-windows x64 platforms currently"
-
-			#endif
-		}
-
-		for (const auto alloced : malloc_alloced)
-		{
-			free(alloced);
-		}
 	}
 }

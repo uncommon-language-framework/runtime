@@ -80,14 +80,15 @@ namespace ULR::IL
 		Or,
 		Not,
 		Xor,
-		CstNC,
-		LdStr,
+		CstNV,
+		LdStr, // to fix GC problem with ldstr, maybe allocate separately (on own) & delete at the end of JITContext
 		LdNC,
 		LdFld,
 		LdLoc,
 		LdAPL,
 		LdElem,
-		LdTpO,
+		LdITO, // may remove, probably useless
+		LdETO, // may remove, may not be feasible (also same GC problem?)
 		Call,
 		Box,
 		UnBox,
@@ -159,7 +160,7 @@ namespace ULR::IL
 		std::vector<void*> virt_alloced;
 		std::vector<void*> malloc_alloced;
 		Resolver::ULRAPIImpl* api;
-		char* (*special_string_MAKE_FROM_LITERAL)(const char*, int);
+		Type* SystemStringType;
 
 		public:
 			JITContext(Resolver::ULRAPIImpl* api);
@@ -199,12 +200,24 @@ namespace ULR::IL
 				byte il[],
 				byte string_ref[]
 			);
-			CompilationError CompileGenericScope(std::vector<byte>& code, size_t& i, byte il[], byte string_ref[], Type* (*ResolveGenericLookup)(byte));
+			CompilationError JITContext::CompileGenericSection(
+				unsigned int locals_size,
+				unsigned int copy_to_rbp_offset_for_return,
+				Type* rettype,
+				std::map<byte*, MemberInfo*>& replace_addrs,
+				Helpers::LocalLookupTable& locals,
+				Helpers::LocalLookupTable& apls,
+				std::vector<byte>& code, size_t& i,
+				byte il[],
+				byte string_ref[],
+				Type* (*ResolveGenericLookup)(byte)
+			);
 			CompilationError CompleteCompilation(std::map<byte*, MemberInfo*>& replace_addrs, std::map<MemberInfo*, std::vector<byte>>& dynamic_code);
 			
 			~JITContext();
 
 		private:
 			std::string_view LookupString(byte il_of_string_ref[], byte string_ref[]);
+			char* CreateULRString(const char* str, int len);
 	};
 }

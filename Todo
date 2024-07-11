@@ -16,3 +16,8 @@
 	- If stack space needs to be alloced for the call, execute `sub rsp, 32+((nargs-4)*8)`
 		- add bytes back to rsp following the call
 	- Update ConstructorInfo::Invoke() accordingly
+- Finish JIT
+	- Fix GC to work with JIT assemblies (can you CONTEXT to get register values to also log as locals (or have JIT assemblies create a list of registers that are used for locals to log less))
+		- Fix ldstr GC issue by using own allocator
+	- Add call capabilites to JIT
+	- Have ULD support reading JIT allocations & JIT interactions
