@@ -38,8 +38,8 @@ namespace ULR::Resolver
 
 	class ULRAPIImpl
 	{
-		Assembly* (*LoadAssemblyPtr)(char name[], ULRAPIImpl* api);
-		HMODULE (*ReadAssemblyPtr)(char name[]);
+		Assembly* (*LoadAssemblyPtr)(const char name[], ULRAPIImpl* api);
+		HMODULE (*ReadAssemblyPtr)(const char name[]);
 		void (*StaticDebug)(StaticDebugInfo& info);
 
 		size_t prev_size_accessible = 0;
@@ -55,36 +55,36 @@ namespace ULR::Resolver
 			std::map<char*, size_t> allocated_objs;
 			size_t allocated_size = 0;
 			std::vector<void*> allocated_field_offsets;
-			std::map<char*, Assembly*, cmp_chr_ptr>* assemblies;
-			std::map<char*, Assembly*, cmp_chr_ptr>* read_assemblies;
+			std::map<std::string_view, Assembly*>* assemblies;
+			std::map<std::string_view, Assembly*>* read_assemblies;
 
 			ULRAPIImpl(
-				std::map<char*, Assembly*, cmp_chr_ptr>* assemblies,
-				std::map<char*, Assembly*, cmp_chr_ptr>* read_assemblies,
-				HMODULE (*ReadAssembly)(char name[]),
-				Assembly* (*LoadAssembly)(char name[], ULRAPIImpl* api),
+				std::map<std::string_view, Assembly*>* assemblies,
+				std::map<std::string_view, Assembly*>* read_assemblies,
+				HMODULE (*ReadAssembly)(const char name[]),
+				Assembly* (*LoadAssembly)(const char name[], ULRAPIImpl* api),
 				void (*PopulateVtable)(Type* type),
 				HMODULE debugger
 			);
 
-			bool EnsureLoaded(char assembly_name[]);
-			Assembly* LoadAssembly(char assembly_name[]);
-			Assembly* LocateAssembly(char assembly_name[]);
+			bool EnsureLoaded(std::string_view assembly_name);
+			Assembly* LoadAssembly(std::string_view assembly_name);
+			Assembly* LocateAssembly(std::string_view assembly_name);
 			void* LocateSymbol(Assembly* assembly, char symbol_name[]);
 
-			std::vector<MemberInfo*> GetMember(Type* type, char name[]);
+			std::vector<MemberInfo*> GetMember(Type* type, std::string_view name);
 
 			ConstructorInfo* GetCtor(Type* type, std::vector<Type*> signature);
 			DestructorInfo* GetDtor(Type* type);
 
-			MethodInfo* GetMethod(Type* type, char name[], std::vector<Type*> argsignature, int bindingflags);
-			MethodInfo* GetNonNewMethod(Type* type, char name[], std::vector<Type*> argsignature, int bindingflags); // this is solely for the virtual table loader
-			FieldInfo* GetField(Type* type, char name[], int bindingflags);
-			PropertyInfo* GetProperty(Type* type, char name[], int bindingflags);
+			MethodInfo* GetMethod(Type* type, std::string_view name, std::vector<Type*> argsignature, int bindingflags);
+			MethodInfo* GetNonNewMethod(Type* type, std::string_view name, std::vector<Type*> argsignature, int bindingflags); // this is solely for the virtual table loader
+			FieldInfo* GetField(Type* type, std::string_view name, int bindingflags);
+			PropertyInfo* GetProperty(Type* type, std::string_view name, int bindingflags);
 			
-			Type* GetArrayTypePrimarily(char full_qual_typename[]);
-			Type* GetType(char full_qual_typename[]);
-			Type* GetType(char full_qual_typename[], char assembly_hint[]);
+			Type* GetArrayTypePrimarily(std::string_view full_qual_typename);
+			Type* GetType(std::string_view full_qual_typename);
+			Type* GetType(std::string_view full_qual_typename, std::string_view assembly_hint);
 			inline Type* GetTypeOf(char* obj) { return *reinterpret_cast<Type**>(obj); } // special inline decl because this is a highly used small API function (for vcalls, so it has to be fast)
 			
 			char* AllocateObject(size_t size);

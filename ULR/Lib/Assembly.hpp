@@ -55,13 +55,6 @@ namespace ULR
 		New = 1 << 10,
 	};
 
-	struct cmp_chr_ptr
-	{
-		bool operator()(char const *a, char const *b) const
-		{
-			return strcmp(a, b) < 0;
-		}
-	};
 
 	class Type;
 	class Assembly;
@@ -76,7 +69,6 @@ namespace ULR
 			int attrs;
 			bool is_empty_generic;
 
-			// MemberInfo(MemberType decl_type, char* name, bool is_static, int attrs);
 			virtual ~MemberInfo();
 	};
 
@@ -88,8 +80,8 @@ namespace ULR
 			char* name;
 			unsigned int attrs;
 			size_t size;
-			std::map<char*, std::vector<MemberInfo*>, cmp_chr_ptr> static_attrs;
-			std::map<char*, std::vector<MemberInfo*>, cmp_chr_ptr> inst_attrs;
+			std::map<std::string_view, std::vector<MemberInfo*>> static_attrs;
+			std::map<std::string_view, std::vector<MemberInfo*>> inst_attrs;
 			
 			std::vector<Type*> interfaces;
 			Type* immediate_base;
@@ -227,7 +219,7 @@ namespace ULR
 			void** addr;
 			char** deps;
 			int (*entry)(char*) = nullptr; // even if Main() doesn't take args, the register will be ignored by Main() so it doesn't matter if we pass it and it doesn't accept string[] argv
-			std::map<char*, Type*, cmp_chr_ptr> types;
+			std::map<std::string_view, Type*> types;
 			std::unordered_map<std::string_view, void*> cached_sym_lookups;
 
 			Assembly(char* name, char* path, char* meta, size_t metalen, void** addr, char** deps, HMODULE handle);

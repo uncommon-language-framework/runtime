@@ -20,10 +20,10 @@ const size_t MAX_TRACEBACK = 30;
 namespace ULR::Resolver
 {
 	ULRAPIImpl::ULRAPIImpl(
-		std::map<char*, Assembly*, cmp_chr_ptr>* assemblies,
-		std::map<char*, Assembly*, cmp_chr_ptr>* read_assemblies,
-		HMODULE (*ReadAssembly)(char name[]),
-		Assembly* (*LoadAssembly)(char name[], ULRAPIImpl* api),
+		std::map<std::string_view, Assembly*>* assemblies,
+		std::map<std::string_view, Assembly*>* read_assemblies,
+		HMODULE (*ReadAssembly)(const char name[]),
+		Assembly* (*LoadAssembly)(const char name[], ULRAPIImpl* api),
 		void (*PopulateVtable)(Type* type),
 		HMODULE debugger
 	)
@@ -51,33 +51,37 @@ namespace ULR::Resolver
 	}
 
 	// returns true if the assembly is successfully loaded. returns false if the assembly was not read yet (and therefore cannot be loaded). If the assembly was read but not loaded, this function loads the assembly fully and returns true
-	bool ULRAPIImpl::EnsureLoaded(char assembly_name[])
+	bool ULRAPIImpl::EnsureLoaded(std::string_view assembly_name)
 	{
+		std::string namecpp(assembly_name);
+
 		if (assemblies->count(assembly_name) == 0)
 		{
 			if (read_assemblies->count(assembly_name) == 0) return false;
 
-			LoadAssemblyPtr(assembly_name, this);
+			LoadAssemblyPtr(namecpp.c_str(), this);
 		}
 
 		return true;
 	}
 
-	Assembly* ULRAPIImpl::LoadAssembly(char assembly_name[])
+	Assembly* ULRAPIImpl::LoadAssembly(std::string_view assembly_name)
 	{
+		std::string namecpp(assembly_name);
+
 		if (read_assemblies->count(assembly_name))
 		{
 			if (assemblies->count(assembly_name)) return assemblies->at(assembly_name);
 
-			return LoadAssemblyPtr(assembly_name, this);
+			return LoadAssemblyPtr(namecpp.c_str(), this);
 		}
 
-		ReadAssemblyPtr(assembly_name);
+		ReadAssemblyPtr(namecpp.c_str());
 
-		return LoadAssemblyPtr(assembly_name, this);
+		return LoadAssemblyPtr(namecpp.c_str(), this);
 	}
 
-	Assembly* ULRAPIImpl::LocateAssembly(char assembly_name[])
+	Assembly* ULRAPIImpl::LocateAssembly(std::string_view assembly_name)
 	{
 		if (read_assemblies->count(assembly_name) != 0) return (*read_assemblies)[assembly_name];
 
@@ -99,7 +103,7 @@ namespace ULR::Resolver
 		return addr;
 	}
 
-	std::vector<MemberInfo*> ULRAPIImpl::GetMember(Type* type, char name[])
+	std::vector<MemberInfo*> ULRAPIImpl::GetMember(Type* type, std::string_view name)
 	{
 		std::vector<MemberInfo*> matches;
 
@@ -133,7 +137,7 @@ namespace ULR::Resolver
 		throw /* new NoConstructor exc*/;
 	}
 
-	MethodInfo* ULRAPIImpl::GetMethod(Type* type, char name[], std::vector<Type*> argsignature, int bindingflags)
+	MethodInfo* ULRAPIImpl::GetMethod(Type* type, std::string_view name, std::vector<Type*> argsignature, int bindingflags)
 	{
 		if ((bindingflags & BindingFlags::Instance) && (type->inst_attrs.count(name)))
 		{
@@ -180,7 +184,7 @@ namespace ULR::Resolver
 		return nullptr;
 	}
 
-	MethodInfo* ULRAPIImpl::GetNonNewMethod(Type* type, char name[], std::vector<Type*> argsignature, int bindingflags)
+	MethodInfo* ULRAPIImpl::GetNonNewMethod(Type* type, std::string_view name, std::vector<Type*> argsignature, int bindingflags)
 	{
 		if ((bindingflags & BindingFlags::Instance) && (type->inst_attrs.count(name)))
 		{
@@ -231,7 +235,7 @@ namespace ULR::Resolver
 		return nullptr;
 	}
 
-	FieldInfo* ULRAPIImpl::GetField(Type* type, char name[], int bindingflags)
+	FieldInfo* ULRAPIImpl::GetField(Type* type, std::string_view name, int bindingflags)
 	{
 		if ((bindingflags & BindingFlags::Instance) && (type->inst_attrs.count(name)))
 		{
@@ -262,7 +266,7 @@ namespace ULR::Resolver
 		return nullptr;	
 	}
 
-	PropertyInfo* ULRAPIImpl::GetProperty(Type* type, char name[], int bindingflags)
+	PropertyInfo* ULRAPIImpl::GetProperty(Type* type, std::string_view name, int bindingflags)
 	{
 		if ((bindingflags & BindingFlags::Instance) && (type->inst_attrs.count(name)))
 		{
@@ -301,22 +305,22 @@ namespace ULR::Resolver
 
 	}
 
-	Type* ULRAPIImpl::GetArrayTypePrimarily(char full_qual_typename[])
+	Type* ULRAPIImpl::GetArrayTypePrimarily(std::string_view full_qual_typename)
 	{
 		Type* tryfind = GetType(full_qual_typename, "ULR.<ArrayTypes>");
 
 		if (tryfind) return tryfind;
 
 		// if array type that is not already found, create it
-		size_t len = strlen(full_qual_typename);
+		size_t len = full_qual_typename.length();
 
 		if (full_qual_typename[len-2] == '[' && full_qual_typename[len-1] == ']') // array type (ends with [])
 		{			
 			Assembly* ArrayTypeAssembly = (*assemblies)["ULR.<ArrayTypes>"];
 			
-			Type* elem_type = GetArrayTypePrimarily(const_cast<char*>(std::string(full_qual_typename, len-2).c_str())); // get inner element type (if it is a nested array, recursion will provide us the proper type)
+			Type* elem_type = GetArrayTypePrimarily(std::string_view(full_qual_typename.data(), len-2)); // get inner element type (if it is a nested array, recursion will provide us the proper type)
 
-			Type* array_type = new Type(TypeType::ArrayType, ArrayTypeAssembly, strdup(full_qual_typename), Modifiers::Public | Modifiers::Sealed, 0, { }, GetType("[System]Object"), elem_type);
+			Type* array_type = new Type(TypeType::ArrayType, ArrayTypeAssembly, strdup(const_cast<const char*>(std::string(full_qual_typename).c_str())), Modifiers::Public | Modifiers::Sealed, 0, { }, GetType("[System]Object"), elem_type);
 
 			PopulateVtablePtr(array_type);
 
@@ -329,7 +333,7 @@ namespace ULR::Resolver
 	}
 
 	// }
-	Type* ULRAPIImpl::GetType(char full_qual_typename[])
+	Type* ULRAPIImpl::GetType(std::string_view full_qual_typename)
 	{
 		for (auto& entry : *assemblies) // optimize this somehow
 		{
@@ -350,7 +354,7 @@ namespace ULR::Resolver
 
 
 		// if array type that is not already found, create it
-		size_t len = strlen(full_qual_typename);
+		size_t len = full_qual_typename.length();
 
 		if (full_qual_typename[len-2] == '[' && full_qual_typename[len-1] == ']') // array type (ends with [])
 		{			
@@ -360,7 +364,7 @@ namespace ULR::Resolver
 		return nullptr;
 	}
 
-	Type* ULRAPIImpl::GetType(char full_qual_typename[], char assembly_hint[])
+	Type* ULRAPIImpl::GetType(std::string_view full_qual_typename, std::string_view assembly_hint)
 	{
 		if (read_assemblies->count(assembly_hint) == 0 && assemblies->count(assembly_hint)) return nullptr;
 

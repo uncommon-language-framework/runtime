@@ -610,15 +610,15 @@ namespace ULR::IL
 
 						if (binding == Flags::Static)
 						{
-							std::string type_name_cpp = std::string(LookupString(&il[i], string_ref));
+							std::string_view type_name = LookupString(&il[i], string_ref);
 
 							i+=4; // from string ref
 
-							std::string field_name_cpp = std::string(LookupString(&il[i], string_ref));
+							std::string_view field_name = LookupString(&il[i], string_ref);
 
 							i+=4; // from string ref
 
-							FieldInfo* field = (FieldInfo*) api->GetType(type_name_cpp.data())->static_attrs[field_name_cpp.data()][0];
+							FieldInfo* field = (FieldInfo*) api->GetType(type_name)->static_attrs[field_name][0];
 
 							if ((field->valtype->decl_type == TypeType::Struct) && (field->valtype->size != 8)) // unfriendly struct types
 							{
@@ -683,15 +683,15 @@ namespace ULR::IL
 						}
 						else if (binding == Flags::Instance)
 						{
-							std::string type_name_cpp = std::string(LookupString(&il[i], string_ref));
+							std::string_view type_name = LookupString(&il[i], string_ref);
 
 							i+=4; // from string ref
 
-							std::string field_name_cpp = std::string(LookupString(&il[i], string_ref));
+							std::string_view field_name = LookupString(&il[i], string_ref);
 
 							i+=4; // from string ref
 
-							FieldInfo* field = (FieldInfo*) api->GetType(type_name_cpp.data())->static_attrs[field_name_cpp.data()][0];
+							FieldInfo* field = (FieldInfo*) api->GetType(type_name)->static_attrs[field_name][0];
 
 							// pop the object from the eval stack, add the offset & dereference
 
@@ -1598,15 +1598,15 @@ namespace ULR::IL
 
 						if (binding == Flags::Static)
 						{
-							std::string type_name_cpp = std::string(LookupString(&il[i], string_ref));
+							std::string_view type_name = LookupString(&il[i], string_ref);
 
 							i+=4; // from string ref
 
-							std::string field_name_cpp = std::string(LookupString(&il[i], string_ref));
+							std::string_view field_name = LookupString(&il[i], string_ref);
 
 							i+=4; // from string ref
 
-							FieldInfo* field = (FieldInfo*) api->GetType(type_name_cpp.data())->static_attrs[field_name_cpp.data()][0];
+							FieldInfo* field = (FieldInfo*) api->GetType(type_name)->static_attrs[field_name][0];
 
 							if ((field->valtype->decl_type == TypeType::Struct) && (field->valtype->size != 8)) // unfriendly struct types
 							{
@@ -1671,15 +1671,15 @@ namespace ULR::IL
 						}
 						else if (binding == Flags::Instance)
 						{
-							std::string type_name_cpp = std::string(LookupString(&il[i], string_ref));
+							std::string_view type_name = LookupString(&il[i], string_ref);
 
 							i+=4; // from string ref
 
-							std::string field_name_cpp = std::string(LookupString(&il[i], string_ref));
+							std::string_view field_name = LookupString(&il[i], string_ref);
 
 							i+=4; // from string ref
 
-							FieldInfo* field = (FieldInfo*) api->GetType(type_name_cpp.data())->static_attrs[field_name_cpp.data()][0];
+							FieldInfo* field = (FieldInfo*) api->GetType(type_name)->static_attrs[field_name][0];
 
 							// pop the object from the eval stack, add the offset & dereference
 

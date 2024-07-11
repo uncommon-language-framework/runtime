@@ -128,18 +128,18 @@ namespace ULR::IL
 
 		i+=4; // skip four bytes of what would be  size 
 
-		Type* type = meta_asm->types[std::string(LookupString(&il[i], string_ref)).data()];
+		Type* type = meta_asm->types[LookupString(&il[i], string_ref)];
 
 		i+=4; // skip four bytes from name string lookup
 
-		type->immediate_base = api->GetType(std::string(LookupString(&il[i], string_ref)).data());
+		type->immediate_base = api->GetType(LookupString(&il[i], string_ref));
 
 		i+=4; // skip four bytes for string lookup for the type's base
 
 		while (il[i] != EndTypeMeta)
 		{
 			type->interfaces.push_back(
-				api->GetType(std::string(LookupString(&il[i], string_ref)).data())
+				api->GetType(LookupString(&il[i], string_ref))
 			);
 
 			i+=4; // skip four bytes of string lookup for an implemented interface
@@ -153,9 +153,8 @@ namespace ULR::IL
 			{
 				i++;
 
-				std::string namecpp = std::string(LookupString(&il[i], string_ref));
+				std::string_view name = LookupString(&il[i], string_ref);
 
-				char* name = const_cast<char*>(namecpp.c_str());
 
 				i+=4; // skip four bytes of stringref
 
@@ -163,7 +162,7 @@ namespace ULR::IL
 
 				i+=2;
 
-				Type* valtype = api->GetType(const_cast<char*>(std::string(LookupString(&il[i], string_ref)).c_str()));
+				Type* valtype = api->GetType(LookupString(&il[i], string_ref));
 
 				i+=4; // skip four bytes of string lookup
 
@@ -202,7 +201,7 @@ namespace ULR::IL
 
 				i++;
 
-				std::string namecpp = std::string(LookupString(&il[i], string_ref));
+				std::string_view name = LookupString(&il[i], string_ref);
 				i+=4; // skip four bytes of string ref
 				
 				Modifiers attrs = (Modifiers) *((uint16_t*) &il[i]);
@@ -210,7 +209,7 @@ namespace ULR::IL
 				// skip two bytes of modifiers
 				i+=2;
 
-				Type* rettype = api->GetType(std::string(LookupString(&il[i], string_ref)).data());
+				Type* rettype = api->GetType(LookupString(&il[i], string_ref));
 
 				i+=4; // skip four bytes of string lookup for rettype
 
@@ -220,11 +219,11 @@ namespace ULR::IL
 
 				if (attrs & Modifiers::Static)
 				{
-					curr_method = (MethodInfo*) type->static_attrs[namecpp.data()][overload_number];
+					curr_method = (MethodInfo*) type->static_attrs[name][overload_number];
 				}
 				else
 				{
-					curr_method = (MethodInfo*) type->inst_attrs[namecpp.data()][overload_number];
+					curr_method = (MethodInfo*) type->inst_attrs[name][overload_number];
 				}
 
 				std::vector<byte>& code = dynamic_code[curr_method];
@@ -248,11 +247,11 @@ namespace ULR::IL
 				{
 					i++; // skip newarg signal
 
-					std::string argname = std::string(LookupString(&il[i], string_ref));
+					std::string_view argname = LookupString(&il[i], string_ref);
 
 					i+=4; // skip four for argtype stringref
 
-					Type* argtype = api->GetType(argname.data());
+					Type* argtype = api->GetType(argname);
 
 					size_t arg_store_size = IsBoxableStruct(argtype) ? argtype->size : 8; 
 
@@ -305,7 +304,7 @@ namespace ULR::IL
 						case LocalDecl:
 							i++;
 							{
-								Type* lcl_type = api->GetType(std::string(LookupString(&il[i], string_ref)).data());
+								Type* lcl_type = api->GetType(LookupString(&il[i], string_ref));
 								size_t lcl_store_size = IsBoxableStruct(lcl_type) ? lcl_type->size : 8; 
 
 

@@ -200,7 +200,7 @@ namespace ULR::IL
 				byte il[],
 				byte string_ref[]
 			);
-			CompilationError JITContext::CompileGenericSection(
+			CompilationError CompileGenericSection(
 				unsigned int locals_size,
 				unsigned int copy_to_rbp_offset_for_return,
 				Type* rettype,
