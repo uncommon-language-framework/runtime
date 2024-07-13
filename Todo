@@ -15,6 +15,8 @@
 - Check MethodInfo::Invoke() on a method with more than 4 args
 	- If stack space needs to be alloced for the call, execute `sub rsp, 32+((nargs-4)*8)`
 		- add bytes back to rsp following the call
+		- Probably shouldn't need stack space, just check if it works
+		- Also check with large value type
 	- Update ConstructorInfo::Invoke() accordingly
 - Finish JIT
 	- Fix GC to work with JIT assemblies (can you CONTEXT to get register values to also log as locals (or have JIT assemblies create a list of registers that are used for locals to log less))

@@ -809,11 +809,138 @@ namespace ULR::IL
 					break;
 				case Call:
 					{
-						unsigned int space_needed;
+						bool instance = (il[i] == Flags::Instance);
+
+						i++; // skip instance/static flag
+
+						Type* type = api->GetType(LookupString(&il[i], string_ref));
+
+						i+=4; // skip four bytes of string lookup
+
+						std::string_view method_name = LookupString(&il[i], string_ref);
+
+						i+=4; // skip four bytes of string lookup
+
+						std::vector<Type*> argsig;
+
+						while (il[i] == OpCodes::NewArg)
+						{
+							i++;
+
+							Type* argtype = api->GetType(LookupString(&il[i], string_ref));
+
+							argsig.push_back(argtype);
+
+							i+=4; // skip four bytes of string lookup
+						}
+
+						MethodInfo* method = api->GetMethod(type, method_name, argsig, instance ? Resolver::BindingFlags::Instance : Resolver::BindingFlags::Static);
+
+						unsigned int space_needed = 0;
+
+						code.insert(code.end(), { 0x48, 0x89, 0xE3 }); // mov rbx, rsp (keep using rsp to push/pop args from eval stack, use rbx as lower stack space to store arg copies)
+
+						if (instance) argsig.insert(argsig.begin(), type);
+
+						unsigned int allocate_for_return = 0;
+						unsigned int retval_allocated_rbp_offset = 0;
+
+						// we will need to allocate from prolog/epilog since this memory needs to last
+						if (NeedsCallAllocatedSpace(method->rettype))
+						{
+							allocate_for_return = method->rettype->size;
+
+							// TODO: pass alloc'd as first arg & set retval_allocated_rbp_offset
+						}
 
 
+						// do first four args (register-passed)
+
+						if (argsig.size() == 0) goto callfunction;
+
+						if (NeedsCallAllocatedSpace(argsig[0]))
+						{
+							// TODO: impl
+						}
+						else code.push_back(0x59); // pop rcx
+
+
+						if (argsig.size() == 1) goto callfunction;
+
+						if (NeedsCallAllocatedSpace(argsig[1]))
+						{
+							// TODO: impl
+						}
+						else code.push_back(0x5A); // pop rdx
+
+
+						if (argsig.size() == 2) goto callfunction;
+
+						if (NeedsCallAllocatedSpace(argsig[2]))
+						{
+							// TODO: impl
+						}
+						else code.insert(code.end(), { 0x41, 0x58 }); // pop r8
+
+
+						if (argsig.size() == 3) goto callfunction;
+
+						if (NeedsCallAllocatedSpace(argsig[3]))
+						{
+							// TODO: impl
+						}
+						else code.insert(code.end(), { 0x41, 0x59 }); // pop r9
+
+
+						if (argsig.size() == 4) goto callfunction;
+
+						// pass args on stack in reverse order... (technically they alr are in reverse order, maybe just have a separate instr for loading large valuetypes as copies so that you don't need to do any processing here)
+
+						callfunction:
+							/*
+								sub rsp, space_needed
+
+								^ set rsp to rbx (end of space allocated) so that new function's frame does not interrupt allocated space
+								the reason rsp was not set in the first place is so that it did not mess up pushing/popping from eval stack
+							*/
+							code.insert(code.end(), { 0x48, 0x81, 0xEC });
+							code.insert(code.end(), (byte*) &space_needed, ((byte*) &space_needed)+sizeof(uint32_t));
+							
+							/*
+								mov rax, 0x0 [addr will be filled later]
+							*/
+
+							code.insert(code.end(), { 0x48, 0xB8 });
+
+							replace_addrs[&code[code.size()]] = method;
+
+							code.insert(code.end(), sizeof(void*), 0);
+
+							code.insert(code.end(), { 0xFF, 0xD0 }); // call rax
+
+							/*
+								add rsp, space_needed
+
+								^ set rsp to what it was before, restoring the correct eval stack pointer
+							*/
+							code.insert(code.end(), { 0x48, 0x81, 0xC4 });
+							code.insert(code.end(), (byte*) &space_needed, ((byte*) &space_needed)+sizeof(uint32_t));
+
+							// after the function returns the return value will be in rax (unless the returnvalue is a large value type)
+							
+							if (allocate_for_return)
+							{
+								/*
+									lea rax, [rbp+retval_allocated_rbp_offset]
+								*/
+								code.insert(code.end(), { 0x48, 0x8D, 0x85 });
+								code.insert(code.end(), (byte*) &retval_allocated_rbp_offset, ((byte*) &retval_allocated_rbp_offset)+sizeof(uint32_t));
+							}
+
+							code.push_back(0x50); // push rax (push retval to eval stack)
+
+							break;
 					}
-					break;
 				case StLoc:
 					num_eval_stack_elems-=1; // net change
 

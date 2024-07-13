@@ -78,6 +78,7 @@ namespace ULR::Resolver
 			DestructorInfo* GetDtor(Type* type);
 
 			MethodInfo* GetMethod(Type* type, std::string_view name, std::vector<Type*> argsignature, int bindingflags);
+			MethodInfo* GetMethod(Type* type, std::string_view name, std::vector<Type*> argsignature);
 			MethodInfo* GetNonNewMethod(Type* type, std::string_view name, std::vector<Type*> argsignature, int bindingflags); // this is solely for the virtual table loader
 			FieldInfo* GetField(Type* type, std::string_view name, int bindingflags);
 			PropertyInfo* GetProperty(Type* type, std::string_view name, int bindingflags);

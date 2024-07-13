@@ -345,12 +345,13 @@ namespace ULR::IL
 				i++; // skip EndMethod
 				
 				// the three lines below insert the prolog (in reverse order visually but forward order in reality)
+				// push rbx
 				// push rbp
 				// mov rbp, rsp
 				// sub rsp, locals_size
 
 				code.insert(code.begin(), (byte*) &locals_size, ((byte*) &locals_size)+sizeof(uint32_t));
-				code.insert(code.begin(), { 0x55, 0x48, 0x89, 0xE5, 0x48, 0x81, 0xEC });
+				code.insert(code.begin(), { 0x53, 0x55, 0x48, 0x89, 0xE5, 0x48, 0x81, 0xEC });
 
 				// epilog
 				// add rsp, locals_size
@@ -361,8 +362,7 @@ namespace ULR::IL
 
 				code.insert(code.end(), { 0x48, 0x81, 0xC4 });
 				code.insert(code.end(), (byte*) &add_to_rsp, ((byte*) &add_to_rsp)+sizeof(uint32_t));
-				code.emplace_back(0x5D); // pop rbp
-				code.emplace_back(0xC3); // ret
+				code.insert(code.end(), { 0x55, 0x53, 0xC3 }); // pop rbp, pop rbx, ret
 
 				void* funcaddr = VirtualAlloc(NULL, code.size(), MEM_COMMIT, PAGE_READWRITE);
 

@@ -154,6 +154,8 @@ namespace ULR::Resolver
 							if (bindingflags & BindingFlags::Public) return casted;
 						}
 						else if (bindingflags & BindingFlags::NonPublic) return casted;
+
+						if (!(bindingflags & BindingFlags::Public) && !(bindingflags & BindingFlags::NonPublic)) return casted; // return the method if neither public nor nonpublic was specified
 					}
 				}
 			}
@@ -174,12 +176,41 @@ namespace ULR::Resolver
 							if (bindingflags & BindingFlags::Public) return casted;
 						}
 						else if (bindingflags & BindingFlags::NonPublic) return casted;
+
+						if (!(bindingflags & BindingFlags::Public) && !(bindingflags & BindingFlags::NonPublic)) return casted; // return the method if neither public nor nonpublic was specified
 					}
 				}
 			}
 		}
 
 		if (type->immediate_base) return GetMethod(type->immediate_base, name, argsignature, bindingflags);
+
+		return nullptr;
+	}
+
+	MethodInfo* ULRAPIImpl::GetMethod(Type* type, std::string_view name, std::vector<Type*> argsignature)
+	{
+		for (const auto member : type->inst_attrs[name])
+		{
+			if (member->decl_type == MemberType::Method)
+			{
+				MethodInfo* casted = (MethodInfo*) member;
+
+				if (casted->argsig == argsignature) return casted;
+			}
+		}
+
+		for (const auto member : type->static_attrs[name])
+		{
+			if (member->decl_type == MemberType::Method)
+			{
+				MethodInfo* casted = (MethodInfo*) member;
+
+				if (casted->argsig == argsignature) return casted;
+			}
+		}
+
+		if (type->immediate_base) return GetMethod(type->immediate_base, name, argsignature);
 
 		return nullptr;
 	}
