@@ -837,7 +837,8 @@ namespace ULR::IL
 						MethodInfo* method = api->GetMethod(type, method_name, argsig, instance ? Resolver::BindingFlags::Instance : Resolver::BindingFlags::Static);
 
 						unsigned int space_needed = 0;
-
+						unsigned int alloc_for_stack_pass = 0;
+						
 						code.insert(code.end(), { 0x48, 0x89, 0xE3 }); // mov rbx, rsp (keep using rsp to push/pop args from eval stack, use rbx as lower stack space to store arg copies)
 
 						if (instance) argsig.insert(argsig.begin(), type);
@@ -860,7 +861,7 @@ namespace ULR::IL
 						}
 
 						// TODO: alloc space_needed & somehow prefix the whole operation (maybe use a sub-vector for passing args, then concat)
-
+						std::vector<byte> argloader;
 
 						// do first four args (register-passed)
 
@@ -872,14 +873,14 @@ namespace ULR::IL
 								lea rcx, [rbp+retval_allocated_rbp_offset]
 							*/
 
-							code.insert(code.end(), { 0x48, 0x8D, 0x8D});
-							code.insert(code.end(), (byte*) &retval_allocated_rbp_offset, ((byte*) &retval_allocated_rbp_offset)+sizeof(uint32_t));
+							argloader.insert(argloader.end(), { 0x48, 0x8D, 0x8D});
+							argloader.insert(argloader.end(), (byte*) &retval_allocated_rbp_offset, ((byte*) &retval_allocated_rbp_offset)+sizeof(uint32_t));
 						}
 						else if (NeedsCallAllocatedSpace(argsig[0]))
 						{
 							unsigned int copy_size = argsig[0]->size;
 
-							code.push_back(0x58); // pop rax
+							argloader.push_back(0x58); // pop rax
 
 							// copy [rax]-[rax+copy_size] to [rbx+space_needed]-[rbx+space_needed+copy_size]
 
@@ -890,22 +891,22 @@ namespace ULR::IL
 									mov [rbx+offset], rdx
 								*/
 
-								code.insert(code.end(), { 0x48, 0x8B, 0x90 });
-								code.insert(code.end(), (byte*) &offset, ((byte*) &offset)+sizeof(uint32_t));
+								argloader.insert(argloader.end(), { 0x48, 0x8B, 0x90 });
+								argloader.insert(argloader.end(), (byte*) &offset, ((byte*) &offset)+sizeof(uint32_t));
 
-								code.insert(code.end(), { 0x48, 0x89, 0x93 });
-								code.insert(code.end(), (byte*) &offset, ((byte*) &offset)+sizeof(uint32_t));
+								argloader.insert(argloader.end(), { 0x48, 0x89, 0x93 });
+								argloader.insert(argloader.end(), (byte*) &offset, ((byte*) &offset)+sizeof(uint32_t));
 							}
 
 							// move rbx+space_needed into rcx to pass addr to alloc'd space
 
-							code.insert(code.end(), { 0x48, 0x8D, 0x8B });
-							code.insert(code.end(), (byte*) &space_needed, ((byte*) &space_needed)+sizeof(uint32_t));
+							argloader.insert(argloader.end(), { 0x48, 0x8D, 0x8B });
+							argloader.insert(argloader.end(), (byte*) &space_needed, ((byte*) &space_needed)+sizeof(uint32_t));
 
 
 							space_needed+=copy_size;
 						}
-						else code.push_back(0x59); // pop rcx
+						else argloader.push_back(0x59); // pop rcx
 
 
 						if (argsig.size() == 1) goto callfunction;
@@ -914,7 +915,7 @@ namespace ULR::IL
 						{
 							unsigned int copy_size = argsig[1]->size;
 
-							code.push_back(0x58); // pop rax
+							argloader.push_back(0x58); // pop rax
 
 							// copy [rax]-[rax+copy_size] to [rbx+space_needed]-[rbx+space_needed+copy_size]
 
@@ -925,22 +926,22 @@ namespace ULR::IL
 									mov [rbx+offset], rdx
 								*/
 
-								code.insert(code.end(), { 0x48, 0x8B, 0x90 });
-								code.insert(code.end(), (byte*) &offset, ((byte*) &offset)+sizeof(uint32_t));
+								argloader.insert(argloader.end(), { 0x48, 0x8B, 0x90 });
+								argloader.insert(argloader.end(), (byte*) &offset, ((byte*) &offset)+sizeof(uint32_t));
 
-								code.insert(code.end(), { 0x48, 0x89, 0x93 });
-								code.insert(code.end(), (byte*) &offset, ((byte*) &offset)+sizeof(uint32_t));
+								argloader.insert(argloader.end(), { 0x48, 0x89, 0x93 });
+								argloader.insert(argloader.end(), (byte*) &offset, ((byte*) &offset)+sizeof(uint32_t));
 							}
 
 							// move rbx+space_needed into rdx to pass addr to alloc'd space
 
-							code.insert(code.end(), { 0x48, 0x8D, 0x93 });
-							code.insert(code.end(), (byte*) &space_needed, ((byte*) &space_needed)+sizeof(uint32_t));
+							argloader.insert(argloader.end(), { 0x48, 0x8D, 0x93 });
+							argloader.insert(argloader.end(), (byte*) &space_needed, ((byte*) &space_needed)+sizeof(uint32_t));
 
 
 							space_needed+=copy_size;
 						}
-						else code.push_back(0x5A); // pop rdx
+						else argloader.push_back(0x5A); // pop rdx
 
 
 						if (argsig.size() == 2) goto callfunction;
@@ -949,7 +950,7 @@ namespace ULR::IL
 						{
 							unsigned int copy_size = argsig[2]->size;
 
-							code.push_back(0x58); // pop rax
+							argloader.push_back(0x58); // pop rax
 
 							// copy [rax]-[rax+copy_size] to [rbx+space_needed]-[rbx+space_needed+copy_size]
 
@@ -960,21 +961,21 @@ namespace ULR::IL
 									mov [rbx+offset], rdx
 								*/
 
-								code.insert(code.end(), { 0x48, 0x8B, 0x90 });
-								code.insert(code.end(), (byte*) &offset, ((byte*) &offset)+sizeof(uint32_t));
+								argloader.insert(argloader.end(), { 0x48, 0x8B, 0x90 });
+								argloader.insert(argloader.end(), (byte*) &offset, ((byte*) &offset)+sizeof(uint32_t));
 
-								code.insert(code.end(), { 0x48, 0x89, 0x93 });
-								code.insert(code.end(), (byte*) &offset, ((byte*) &offset)+sizeof(uint32_t));
+								argloader.insert(argloader.end(), { 0x48, 0x89, 0x93 });
+								argloader.insert(argloader.end(), (byte*) &offset, ((byte*) &offset)+sizeof(uint32_t));
 							}
 
 							// move rbx+space_needed into r8 to pass addr to alloc'd space
 
-							code.insert(code.end(), { 0x4C, 0x8D, 0x83 });
-							code.insert(code.end(), (byte*) &space_needed, ((byte*) &space_needed)+sizeof(uint32_t));
+							argloader.insert(argloader.end(), { 0x4C, 0x8D, 0x83 });
+							argloader.insert(argloader.end(), (byte*) &space_needed, ((byte*) &space_needed)+sizeof(uint32_t));
 
 
 							space_needed+=copy_size;						}
-						else code.insert(code.end(), { 0x41, 0x58 }); // pop r8
+						else argloader.insert(argloader.end(), { 0x41, 0x58 }); // pop r8
 
 
 						if (argsig.size() == 3) goto callfunction;
@@ -983,7 +984,7 @@ namespace ULR::IL
 						{
 							unsigned int copy_size = argsig[3]->size;
 
-							code.push_back(0x58); // pop rax
+							argloader.push_back(0x58); // pop rax
 
 							// copy [rax]-[rax+copy_size] to [rbx+space_needed]-[rbx+space_needed+copy_size]
 
@@ -994,36 +995,89 @@ namespace ULR::IL
 									mov [rbx+offset], rdx
 								*/
 
-								code.insert(code.end(), { 0x48, 0x8B, 0x90 });
-								code.insert(code.end(), (byte*) &offset, ((byte*) &offset)+sizeof(uint32_t));
+								argloader.insert(argloader.end(), { 0x48, 0x8B, 0x90 });
+								argloader.insert(argloader.end(), (byte*) &offset, ((byte*) &offset)+sizeof(uint32_t));
 
-								code.insert(code.end(), { 0x48, 0x89, 0x93 });
-								code.insert(code.end(), (byte*) &offset, ((byte*) &offset)+sizeof(uint32_t));
+								argloader.insert(argloader.end(), { 0x48, 0x89, 0x93 });
+								argloader.insert(argloader.end(), (byte*) &offset, ((byte*) &offset)+sizeof(uint32_t));
 							}
 
 							// move rbx+space_needed into r9 to pass addr to alloc'd space
 
-							code.insert(code.end(), { 0x4C, 0x8D, 0x8B });
-							code.insert(code.end(), (byte*) &space_needed, ((byte*) &space_needed)+sizeof(uint32_t));
+							argloader.insert(argloader.end(), { 0x4C, 0x8D, 0x8B });
+							argloader.insert(argloader.end(), (byte*) &space_needed, ((byte*) &space_needed)+sizeof(uint32_t));
 
 
 							space_needed+=copy_size;						}
-						else code.insert(code.end(), { 0x41, 0x59 }); // pop r9
-
+						else argloader.insert(argloader.end(), { 0x41, 0x59 }); // pop r9
 
 						if (argsig.size() == 4) goto callfunction;
 
+						alloc_for_stack_pass = 8*(argsig.size()-4);
+
 						// pass args on stack in reverse order... (technically they alr are in reverse order, maybe just have a separate instr for loading large valuetypes as copies so that you don't need to do any processing here)
+						for (size_t i = argsig.size()-1; i >= 4; i--)
+						{
+							if (NeedsCallAllocatedSpace(argsig[3]))
+							{
+								unsigned int copy_size = argsig[3]->size;
+
+								argloader.push_back(0x58); // pop rax
+
+								// copy [rax]-[rax+copy_size] to [rbx+space_needed]-[rbx+space_needed+copy_size]
+
+								for (unsigned int offset = 0; offset < copy_size; offset+=8) // all sizes should be aligned to 8 bytes (the pointer size)
+								{
+									/*
+										mov rdx, [rax+offset]
+										mov [rbx+offset], rdx
+									*/
+
+									argloader.insert(argloader.end(), { 0x48, 0x8B, 0x90 });
+									argloader.insert(argloader.end(), (byte*) &offset, ((byte*) &offset)+sizeof(uint32_t));
+
+									argloader.insert(argloader.end(), { 0x48, 0x89, 0x93 });
+									argloader.insert(argloader.end(), (byte*) &offset, ((byte*) &offset)+sizeof(uint32_t));
+								}
+
+								// move rbx+space_needed into rax to pass addr to alloc'd space (via lea)
+
+								argloader.insert(argloader.end(), { 0x48, 0x8D, 0x83 });
+								argloader.insert(argloader.end(), (byte*) &space_needed, ((byte*) &space_needed)+sizeof(uint32_t));
+
+
+								space_needed+=copy_size;
+							}
+							else argloader.push_back(0x58); // pop rax
+
+							// addr/val to pass in rax
+							// NOTE: think sub rsp, 32 beforehand (placing [rsp+32 as fifth arg correctly])
+
+							asm volatile(
+								"mov [rsp+%1], %0\n\t"
+								:
+								:"r"(arg), "r"(24+(numargs-i)*8)
+							);
+						}
 
 						callfunction:
 							/*
-								sub rsp, space_needed
+								mov rbx, rsp
+								sub rbx, space_needed
+							*/
+
+							code.insert(code.end(), { 0x48, 0x89, 0xE3, 0x48, 0x81, 0xEB });
+							code.insert(code.end(), (byte*) &space_needed, ((byte*) &space_needed)+sizeof(uint32_t));
+
+							code.insert(code.end(), argloader.begin(), argloader.end());
+
+							/*
+								mov rsp, rbx
 
 								^ set rsp to rbx (end of space allocated) so that new function's frame does not interrupt allocated space
 								the reason rsp was not set in the first place is so that it did not mess up pushing/popping from eval stack
 							*/
-							code.insert(code.end(), { 0x48, 0x81, 0xEC });
-							code.insert(code.end(), (byte*) &space_needed, ((byte*) &space_needed)+sizeof(uint32_t));
+							code.insert(code.end(), { 0x48, 0x89, 0xDC });
 							
 							/*
 								mov rax, 0x0 [addr will be filled later]
