@@ -6,7 +6,7 @@ namespace ULR::IL
 	// sections will have a net change of 0 elements to the evalutation stack
 	// sections should not pop anything off of the evaluation stack that they did not push on to it (either directly or indirectly)
 	CompilationError JITContext::CompileSection(
-		unsigned int locals_size,
+		unsigned int& locals_size,
 		unsigned int copy_to_rbp_offset_for_return,
 		Type* rettype,
 		std::map<byte*, MemberInfo*>& replace_addrs,
@@ -851,16 +851,59 @@ namespace ULR::IL
 							allocate_for_return = method->rettype->size;
 
 							// TODO: pass alloc'd as first arg & set retval_allocated_rbp_offset
+
+							retval_allocated_rbp_offset = locals_size;
+
+							locals_size+=allocate_for_return;
+
+							argsig.insert(argsig.begin(), nullptr);
 						}
+
+						// TODO: alloc space_needed & somehow prefix the whole operation (maybe use a sub-vector for passing args, then concat)
 
 
 						// do first four args (register-passed)
 
 						if (argsig.size() == 0) goto callfunction;
 
-						if (NeedsCallAllocatedSpace(argsig[0]))
+						if (allocate_for_return) // if we need to allocate for return val, then the pointer to the allocated space must be passed as the first argument
 						{
-							// TODO: impl
+							/*
+								lea rcx, [rbp+retval_allocated_rbp_offset]
+							*/
+
+							code.insert(code.end(), { 0x48, 0x8D, 0x8D});
+							code.insert(code.end(), (byte*) &retval_allocated_rbp_offset, ((byte*) &retval_allocated_rbp_offset)+sizeof(uint32_t));
+						}
+						else if (NeedsCallAllocatedSpace(argsig[0]))
+						{
+							unsigned int copy_size = argsig[0]->size;
+
+							code.push_back(0x58); // pop rax
+
+							// copy [rax]-[rax+copy_size] to [rbx+space_needed]-[rbx+space_needed+copy_size]
+
+							for (unsigned int offset = 0; offset < copy_size; offset+=8) // all sizes should be aligned to 8 bytes (the pointer size)
+							{
+								/*
+									mov rdx, [rax+offset]
+									mov [rbx+offset], rdx
+								*/
+
+								code.insert(code.end(), { 0x48, 0x8B, 0x90 });
+								code.insert(code.end(), (byte*) &offset, ((byte*) &offset)+sizeof(uint32_t));
+
+								code.insert(code.end(), { 0x48, 0x89, 0x93 });
+								code.insert(code.end(), (byte*) &offset, ((byte*) &offset)+sizeof(uint32_t));
+							}
+
+							// move rbx+space_needed into rcx to pass addr to alloc'd space
+
+							code.insert(code.end(), { 0x48, 0x8D, 0x8B });
+							code.insert(code.end(), (byte*) &space_needed, ((byte*) &space_needed)+sizeof(uint32_t));
+
+
+							space_needed+=copy_size;
 						}
 						else code.push_back(0x59); // pop rcx
 
@@ -869,7 +912,33 @@ namespace ULR::IL
 
 						if (NeedsCallAllocatedSpace(argsig[1]))
 						{
-							// TODO: impl
+							unsigned int copy_size = argsig[1]->size;
+
+							code.push_back(0x58); // pop rax
+
+							// copy [rax]-[rax+copy_size] to [rbx+space_needed]-[rbx+space_needed+copy_size]
+
+							for (unsigned int offset = 0; offset < copy_size; offset+=8) // all sizes should be aligned to 8 bytes (the pointer size)
+							{
+								/*
+									mov rdx, [rax+offset]
+									mov [rbx+offset], rdx
+								*/
+
+								code.insert(code.end(), { 0x48, 0x8B, 0x90 });
+								code.insert(code.end(), (byte*) &offset, ((byte*) &offset)+sizeof(uint32_t));
+
+								code.insert(code.end(), { 0x48, 0x89, 0x93 });
+								code.insert(code.end(), (byte*) &offset, ((byte*) &offset)+sizeof(uint32_t));
+							}
+
+							// move rbx+space_needed into rdx to pass addr to alloc'd space
+
+							code.insert(code.end(), { 0x48, 0x8D, 0x93 });
+							code.insert(code.end(), (byte*) &space_needed, ((byte*) &space_needed)+sizeof(uint32_t));
+
+
+							space_needed+=copy_size;
 						}
 						else code.push_back(0x5A); // pop rdx
 
@@ -878,8 +947,33 @@ namespace ULR::IL
 
 						if (NeedsCallAllocatedSpace(argsig[2]))
 						{
-							// TODO: impl
-						}
+							unsigned int copy_size = argsig[2]->size;
+
+							code.push_back(0x58); // pop rax
+
+							// copy [rax]-[rax+copy_size] to [rbx+space_needed]-[rbx+space_needed+copy_size]
+
+							for (unsigned int offset = 0; offset < copy_size; offset+=8) // all sizes should be aligned to 8 bytes (the pointer size)
+							{
+								/*
+									mov rdx, [rax+offset]
+									mov [rbx+offset], rdx
+								*/
+
+								code.insert(code.end(), { 0x48, 0x8B, 0x90 });
+								code.insert(code.end(), (byte*) &offset, ((byte*) &offset)+sizeof(uint32_t));
+
+								code.insert(code.end(), { 0x48, 0x89, 0x93 });
+								code.insert(code.end(), (byte*) &offset, ((byte*) &offset)+sizeof(uint32_t));
+							}
+
+							// move rbx+space_needed into r8 to pass addr to alloc'd space
+
+							code.insert(code.end(), { 0x4C, 0x8D, 0x83 });
+							code.insert(code.end(), (byte*) &space_needed, ((byte*) &space_needed)+sizeof(uint32_t));
+
+
+							space_needed+=copy_size;						}
 						else code.insert(code.end(), { 0x41, 0x58 }); // pop r8
 
 
@@ -887,8 +981,33 @@ namespace ULR::IL
 
 						if (NeedsCallAllocatedSpace(argsig[3]))
 						{
-							// TODO: impl
-						}
+							unsigned int copy_size = argsig[3]->size;
+
+							code.push_back(0x58); // pop rax
+
+							// copy [rax]-[rax+copy_size] to [rbx+space_needed]-[rbx+space_needed+copy_size]
+
+							for (unsigned int offset = 0; offset < copy_size; offset+=8) // all sizes should be aligned to 8 bytes (the pointer size)
+							{
+								/*
+									mov rdx, [rax+offset]
+									mov [rbx+offset], rdx
+								*/
+
+								code.insert(code.end(), { 0x48, 0x8B, 0x90 });
+								code.insert(code.end(), (byte*) &offset, ((byte*) &offset)+sizeof(uint32_t));
+
+								code.insert(code.end(), { 0x48, 0x89, 0x93 });
+								code.insert(code.end(), (byte*) &offset, ((byte*) &offset)+sizeof(uint32_t));
+							}
+
+							// move rbx+space_needed into r9 to pass addr to alloc'd space
+
+							code.insert(code.end(), { 0x4C, 0x8D, 0x8B });
+							code.insert(code.end(), (byte*) &space_needed, ((byte*) &space_needed)+sizeof(uint32_t));
+
+
+							space_needed+=copy_size;						}
 						else code.insert(code.end(), { 0x41, 0x59 }); // pop r9
 
 
@@ -1085,6 +1204,7 @@ namespace ULR::IL
 					// epilog
 					// add rsp, add_to_rsp	
 					// pop rbp
+					// pop rbx
 					// ret
 
 					{
@@ -1092,8 +1212,7 @@ namespace ULR::IL
 
 						code.insert(code.end(), { 0x48, 0x81, 0xC4 });
 						code.insert(code.end(), (byte*) &add_to_rsp, ((byte*) &add_to_rsp)+sizeof(uint32_t));
-						code.emplace_back(0x5D); // pop rbp
-						code.emplace_back(0xC3); // ret
+						code.insert(code.end(), { 0x55, 0x53, 0xC3 }); // pop rbp, pop rbx, ret
 					}
 
 					break;
@@ -1120,7 +1239,7 @@ namespace ULR::IL
 	}
 
 	CompilationError JITContext::CompileGenericSection(
-		unsigned int locals_size,
+		unsigned int& locals_size,
 		unsigned int copy_to_rbp_offset_for_return,
 		Type* rettype,
 		std::map<byte*, MemberInfo*>& replace_addrs,

@@ -80,10 +80,22 @@ namespace ULR
 				if (numargs > 1) second_arg = argsrawarr[1];
 				if (numargs > 2) third_arg = argsrawarr[2];
 				if (numargs > 3) fourth_arg = argsrawarr[3];
+
 				void* ret;
+
+				size_t stack_alloc_size = 0;
 				
 				if (numargs > 4)
 				{
+					stack_alloc_size = (numargs-4)*8;
+
+					asm volatile(
+						"sub rsp, %0"
+						:
+						:"r"(stack_alloc_size)
+					);
+
+
 					for (size_t i = numargs-1; i >= 4; i--)
 					{
 						void* arg = argsrawarr[i];
@@ -107,9 +119,10 @@ namespace ULR
 						"mov r9, %4\n\t"
 						"movq xmm3, %4\n\t"
 						"call %5\n\t"
+						"add rsp, %6\n\t"
 						"mov %0, rax\n\t"
 						:"=r"(ret)
-						:"r"(first_arg), "r"(second_arg), "r"(third_arg), "r"(fourth_arg), "r"(offset)
+						:"r"(first_arg), "r"(second_arg), "r"(third_arg), "r"(fourth_arg), "r"(offset), "r"(stack_alloc_size)
 						:"rax", "rcx", "rdx", "r8", "r9", "r10", "r11", "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5"
 					);
 				else if (numargs > 2)
@@ -121,9 +134,10 @@ namespace ULR
 						"mov r8, %3\n\t"
 						"movq xmm2, %3\n\t"
 						"call %4\n\t"
+						"add rsp, %5\n\t"
 						"mov %0, rax\n\t"
 						:"=r"(ret)
-						:"r"(first_arg), "r"(second_arg), "r"(third_arg), "r"(offset)
+						:"r"(first_arg), "r"(second_arg), "r"(third_arg), "r"(offset), "r"(stack_alloc_size)
 						:"rax", "rcx", "rdx", "r8", "r9", "r10", "r11", "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5"
 					);
 				else if (numargs > 1)
@@ -133,9 +147,10 @@ namespace ULR
 						"mov rdx, %2\n\t"
 						"movq xmm1, %2\n\t"
 						"call %3\n\t"
+						"add rsp, %4\n\t"
 						"mov %0, rax\n\t"
 						:"=r"(ret)
-						:"r"(first_arg), "r"(second_arg), "r"(offset)
+						:"r"(first_arg), "r"(second_arg), "r"(offset), "r"(stack_alloc_size)
 						:"rax", "rcx", "rdx", "r8", "r9", "r10", "r11", "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5"
 					);
 				else if (numargs > 0)
@@ -143,17 +158,19 @@ namespace ULR
 						"mov rcx, %1\n\t"
 						"movq xmm0, %1\n\t"
 						"call %2\n\t"
+						"add rsp, %3\n\t"
 						"mov %0, rax\n\t"
 						:"=r"(ret)
-						:"r"(first_arg), "r"(offset)
+						:"r"(first_arg), "r"(offset), "r"(stack_alloc_size)
 						:"rax", "rcx", "rdx", "r8", "r9", "r10", "r11", "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5"
 					);
 				else
 					asm volatile(
 						"call %1\n\t"
+						"add rsp, %2\n\t"
 						"mov %0, rax\n\t"
 						:"=r"(ret)
-						:"r"(offset)
+						:"r"(offset), "r"(stack_alloc_size)
 						:"rax", "rcx", "rdx", "r8", "r9", "r10", "r11", "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5"
 					);
 

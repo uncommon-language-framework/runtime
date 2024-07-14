@@ -356,6 +356,7 @@ namespace ULR::IL
 				// epilog
 				// add rsp, locals_size
 				// pop rbp
+				// POP rbx
 				// ret
 
 				unsigned int add_to_rsp = locals_size+(num_eval_stack_elems*8);

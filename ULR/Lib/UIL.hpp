@@ -89,6 +89,7 @@ namespace ULR::IL
 		LdElem,
 		LdITO, // may remove, probably useless
 		LdETO, // may remove, may not be feasible (also same GC problem?)
+		VTSCp, // ValueType Stack Copy
 		Call,
 		Box,
 		UnBox,
@@ -189,8 +190,8 @@ namespace ULR::IL
 			);
 			CompilationError CompileGenericType(Assembly* meta_asm, size_t& i, byte il[], byte string_ref[], Type* (*ResolveGenericLookup)(byte));
 			
-			CompilationError CompileSection(
-				unsigned int locals_size,
+			CompilationError CompileSection( // TODO: refactor so that this just maps to a CompileGenericSection call with no generic resolver passed
+				unsigned int& locals_size,
 				unsigned int copy_to_rbp_offset_for_return,
 				Type* rettype,
 				std::map<byte*, MemberInfo*>& replace_addrs,
@@ -201,7 +202,7 @@ namespace ULR::IL
 				byte string_ref[]
 			);
 			CompilationError CompileGenericSection(
-				unsigned int locals_size,
+				unsigned int& locals_size,
 				unsigned int copy_to_rbp_offset_for_return,
 				Type* rettype,
 				std::map<byte*, MemberInfo*>& replace_addrs,
