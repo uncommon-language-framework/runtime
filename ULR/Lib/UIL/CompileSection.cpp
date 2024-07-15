@@ -839,7 +839,6 @@ namespace ULR::IL
 						MethodInfo* method = api->GetMethod(type, method_name, argsig, instance ? Resolver::BindingFlags::Instance : Resolver::BindingFlags::Static);
 
 						unsigned int space_needed = 0;
-						unsigned int alloc_for_stack_pass = 0;
 						
 						if (instance) argsig.insert(argsig.begin(), type);
 
@@ -1020,8 +1019,6 @@ namespace ULR::IL
 
 						if (argsig.size() == 4) goto callfunction;
 
-						alloc_for_stack_pass = 8*(argsig.size()-4);
-
 
 						// pass args on stack in reverse order... (they were passed in reverse order so we can forward them in forward order)
 						for (size_t i = 0; (i+4) < argsig.size(); i++)
@@ -1091,18 +1088,18 @@ namespace ULR::IL
 								notice the minus; this is why negation is below
 							*/
 
-							int space_needed_neg = -space_needed;
+							int space_needed_neg = -(space_needed+argsig.size()*8);
 
 							code.insert(code.end(), { 0x48, 0x8D, 0x9C, 0x24 });
 							code.insert(code.end(), (byte*) &space_needed_neg, ((byte*) &space_needed_neg)+sizeof(uint32_t));
 
+
+							int arg_alloc = -(argsig.size()*8);
 							
-							int arg_alloc = -(alloc_for_stack_pass+32); // we need -32 because we start passing stack args at [rsp+32]
-
 							/*
-								lea r10, [rbx+arg_alloc]
+								lea r10, [rbx-arg_alloc]
 
-								arg_alloc is negative, setting r10 to the absolute minimum (largest extent) of stack space allocated for the call
+								setting r10 to the absolute minimum (largest extent) of stack space allocated for the call argss
 							*/
 
 							code.insert(code.end(), { 0x4C, 0x8D, 0x93 });
@@ -1120,6 +1117,17 @@ namespace ULR::IL
 							*/
 
 							code.insert(code.end(), { 0x4C, 0x89, 0xD4 });
+
+							// align stack to 16 bytes
+
+							bool align8 = false;
+
+							if (num_eval_stack_elems % 2 != 0)
+							{
+								align8 = true;
+
+								code.insert(code.end(), { 0x48, 0x83, 0xEC, 0x08 }); // sub rsp, 8
+							}
 							
 							/*
 								mov rax, 0x0 [addr will be filled later]
@@ -1136,13 +1144,29 @@ namespace ULR::IL
 							/*
 								add rsp, space_needed-arg_alloc
 
-								^ set rsp to what it was before, restoring the correct eval stack pointer (arg alloc is negative, so we subtract it from space_needed to increase)
+								^ set rsp to what it was before, restoring the correct eval stack pointer (arg alloc & space_needed_neg are negative, so we negate for increase)
 							*/
 
-							unsigned int total_alloc = space_needed-arg_alloc;
+							unsigned int total_alloc = -(space_needed_neg+arg_alloc);
 
 							code.insert(code.end(), { 0x48, 0x81, 0xC4 });
 							code.insert(code.end(), (byte*) &total_alloc, ((byte*) &total_alloc)+sizeof(uint32_t));
+
+							if (align8)
+							{
+								code.insert(code.end(), { 0x48, 0x83, 0xC4, 0x08 }); // add rsp, 8
+							}
+
+							/*
+								add rsp, argsig.size()*8
+
+								rbp & r10 were set before argsig.size() elems were popped off the eval stack, so resp is argsig.size() elems artifically lower than it should be
+							*/
+
+							unsigned int stack_elevation = argsig.size()*8;
+
+							code.insert(code.end(), { 0x48, 0x81, 0xC4 });
+							code.insert(code.end(), (byte*) &stack_elevation, ((byte*) &stack_elevation)+sizeof(uint32_t));
 
 							// after the function returns the return value will be in rax (unless the returnvalue is a large value type)
 							

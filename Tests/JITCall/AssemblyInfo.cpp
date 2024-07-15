@@ -159,6 +159,7 @@ sizeof_ns1_System_Int32 overload0_ns0_Program_Main(char* argv)
 sizeof_ns1_System_Int32 overload0_ns0_Program_Add(sizeof_ns1_System_Int32 x, sizeof_ns1_System_Int32 y)
 {
 	TEST(true, 3);
+
 	return x+y;
 }
 

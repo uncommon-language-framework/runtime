@@ -10,6 +10,7 @@ namespace ULR::IL
 		return StackBaseCompile(meta_asm, il, string_ref);
 	}
 
+	// NOTE-IMPORTANT-NOTE: as a soln for the 12-byte offset replace_addr problem, follow the CLR JIT pattern (dereference pretedermined addr [from JIT malloc pool] which is later filled)
 	// TODO: add support for ctors and dtors
 	// TODO: make sure JIT aligns all pointers to eight bytes OR think of a better soln
 	// TODO: add support for generic IL
