@@ -17,7 +17,7 @@ namespace ULR::IL
 		byte string_ref[]
 	)
 	{
-		unsigned int num_eval_stack_elems;
+		unsigned int num_eval_stack_elems = 0;
 
 		while ((il[i] != EndMethod) && (il[i] != BeginSection))
 		{
@@ -1306,7 +1306,7 @@ namespace ULR::IL
 
 						code.insert(code.end(), { 0x48, 0x81, 0xC4 });
 						code.insert(code.end(), (byte*) &add_to_rsp, ((byte*) &add_to_rsp)+sizeof(uint32_t));
-						code.insert(code.end(), { 0x55, 0x53, 0xC3 }); // pop rbp, pop rbx, ret
+						code.insert(code.end(), { 0x5D, 0x5B, 0xC3 }); // pop rbp, pop rbx, ret
 					}
 
 					break;

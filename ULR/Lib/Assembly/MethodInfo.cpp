@@ -89,13 +89,6 @@ namespace ULR
 				{
 					stack_alloc_size = (numargs-4)*8;
 
-					asm volatile(
-						"sub rsp, %0"
-						:
-						:"r"(stack_alloc_size)
-					);
-
-
 					for (size_t i = numargs-1; i >= 4; i--)
 					{
 						void* arg = argsrawarr[i];
@@ -103,13 +96,14 @@ namespace ULR
 						asm volatile(
 							"mov [rsp+%1], %0\n\t"
 							:
-							:"r"(arg), "r"(24+(numargs-i)*8)
+							:"r"(arg), "r"((24+(numargs-i)*8)-stack_alloc_size)
 						);
 					}
 				}
 
 				if (numargs > 3)
 					asm volatile(
+						"sub rsp, %6\n\t"
 						"mov rcx, %1\n\t"
 						"movq xmm0, %1\n\t"
 						"mov rdx, %2\n\t"
@@ -127,6 +121,7 @@ namespace ULR
 					);
 				else if (numargs > 2)
 					asm volatile(
+						"sub rsp, %5\n\t"
 						"mov rcx, %1\n\t"
 						"movq xmm0, %1\n\t"
 						"mov rdx, %2\n\t"
@@ -142,6 +137,7 @@ namespace ULR
 					);
 				else if (numargs > 1)
 					asm volatile(
+						"sub rsp, %4\n\t"
 						"mov rcx, %1\n\t"
 						"movq xmm0, %1\n\t"
 						"mov rdx, %2\n\t"
@@ -155,6 +151,7 @@ namespace ULR
 					);
 				else if (numargs > 0)
 					asm volatile(
+						"sub rsp, %3\n\t"
 						"mov rcx, %1\n\t"
 						"movq xmm0, %1\n\t"
 						"call %2\n\t"
@@ -166,6 +163,7 @@ namespace ULR
 					);
 				else
 					asm volatile(
+						"sub rsp, %2\n\t"
 						"call %1\n\t"
 						"add rsp, %2\n\t"
 						"mov %0, rax\n\t"
