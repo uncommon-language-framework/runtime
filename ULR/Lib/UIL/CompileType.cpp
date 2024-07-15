@@ -117,7 +117,7 @@ namespace ULR::IL
 
 	CompilationError JITContext::CompileType(
 		Assembly* meta_asm,
-		std::map<byte*, MemberInfo*>& replace_addrs,
+		std::map<std::pair<std::vector<byte>*, size_t>, MemberInfo*>& replace_addrs,
 		std::map<MemberInfo*, std::vector<byte>>& dynamic_code,
 		size_t& i, byte il[], byte string_ref[]
 	)
@@ -351,8 +351,12 @@ namespace ULR::IL
 				// mov rbp, rsp
 				// sub rsp, locals_size
 
-				code.insert(code.begin(), (byte*) &locals_size, ((byte*) &locals_size)+sizeof(uint32_t));
-				code.insert(code.begin(), { 0x53, 0x55, 0x48, 0x89, 0xE5, 0x48, 0x81, 0xEC });
+				code.insert(code.begin(), (byte*) &locals_size, ((byte*) &locals_size)+sizeof(uint32_t)); // 4 bytes
+				code.insert(code.begin(), { 0x53, 0x55, 0x48, 0x89, 0xE5, 0x48, 0x81, 0xEC }); // 8 bytes
+
+				// ^ twelve byte total epilog
+				// IMPORTANT: with any insertion to the beginning, we must offset all indexes in replace_addrs by the same amount of bytes
+				// right now there is no good permanent soln, a constant 12 bytes is being used in JITCompile.cpp
 
 				// epilog
 				// add rsp, locals_size

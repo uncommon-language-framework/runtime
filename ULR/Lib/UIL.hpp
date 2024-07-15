@@ -184,7 +184,7 @@ namespace ULR::IL
 			CompilationError ReadTypeMeta(Assembly* meta_asm, size_t& i, byte il[], byte string_ref[]);
 			CompilationError CompileType(
 				Assembly* meta_asm,
-				std::map<byte*, MemberInfo*>& replace_addrs,
+				std::map<std::pair<std::vector<byte>*, size_t>, MemberInfo*>& replace_addrs,
 				std::map<MemberInfo*, std::vector<byte>>& dynamic_code,
 				size_t& i, byte il[], byte string_ref[]
 			);
@@ -194,26 +194,26 @@ namespace ULR::IL
 				unsigned int& locals_size,
 				unsigned int copy_to_rbp_offset_for_return,
 				Type* rettype,
-				std::map<byte*, MemberInfo*>& replace_addrs,
+				std::map<std::pair<std::vector<byte>*, size_t>, MemberInfo*>& replace_addrs,
 				Helpers::LocalLookupTable& locals,
 				Helpers::LocalLookupTable& apls,
 				std::vector<byte>& code, size_t& i,
 				byte il[],
 				byte string_ref[]
 			);
-			CompilationError CompileGenericSection(
-				unsigned int& locals_size,
-				unsigned int copy_to_rbp_offset_for_return,
-				Type* rettype,
-				std::map<byte*, MemberInfo*>& replace_addrs,
-				Helpers::LocalLookupTable& locals,
-				Helpers::LocalLookupTable& apls,
-				std::vector<byte>& code, size_t& i,
-				byte il[],
-				byte string_ref[],
-				Type* (*ResolveGenericLookup)(byte)
-			);
-			CompilationError CompleteCompilation(std::map<byte*, MemberInfo*>& replace_addrs, std::map<MemberInfo*, std::vector<byte>>& dynamic_code);
+			// CompilationError CompileGenericSection(
+			// 	unsigned int& locals_size,
+			// 	unsigned int copy_to_rbp_offset_for_return,
+			// 	Type* rettype,
+			// 	std::map<byte*, MemberInfo*>& replace_addrs,
+			// 	Helpers::LocalLookupTable& locals,
+			// 	Helpers::LocalLookupTable& apls,
+			// 	std::vector<byte>& code, size_t& i,
+			// 	byte il[],
+			// 	byte string_ref[],
+			// 	Type* (*ResolveGenericLookup)(byte)
+			// );
+			CompilationError CompleteCompilation(std::map<std::pair<std::vector<byte>*, size_t>, MemberInfo*>& replace_addrs, std::map<MemberInfo*, std::vector<byte>>& dynamic_code, size_t offset_replace_addrs);
 			
 			~JITContext();
 

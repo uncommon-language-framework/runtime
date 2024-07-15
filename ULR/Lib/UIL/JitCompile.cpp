@@ -23,7 +23,7 @@ namespace ULR::IL
 
 		size_t i = 0;
 
-		std::map<byte*, MemberInfo*> replace_addrs;
+		std::map<std::pair<std::vector<byte>*, size_t>, MemberInfo*> replace_addrs;
 		std::map<MemberInfo*, std::vector<byte>> dynamic_code;
 
 		/* FIRST PASS - MAP OUT ASSEMBLY METADATA */
@@ -68,14 +68,14 @@ namespace ULR::IL
 			if (error) return error;
 		}
 
-		auto error = CompleteCompilation(replace_addrs, dynamic_code); // third pass
+		auto error = CompleteCompilation(replace_addrs, dynamic_code, 12); // third pass, offset replace addrs by twelve bytes (12 bytes of prolog) - TODO: find better fix for this
 
 		if (error) return error;
 
 		return NoError;
 	}
 
-	CompilationError JITContext::CompleteCompilation(std::map<byte*, MemberInfo*>& replace_addrs, std::map<MemberInfo*, std::vector<byte>>& dynamic_code)
+	CompilationError JITContext::CompleteCompilation(std::map<std::pair<std::vector<byte>*, size_t>, MemberInfo*>& replace_addrs, std::map<MemberInfo*, std::vector<byte>>& dynamic_code, size_t offset_replace_addrs)
 	{
 		/* THIRD PASS - RESOLVE FUNCTION AND FIELD ADDRS */
 		for (const auto& entry : replace_addrs)
@@ -83,20 +83,20 @@ namespace ULR::IL
 			switch (entry.second->decl_type)
 			{
 				case Method:
-					memcpy(entry.first, &((MethodInfo*) entry.second)->offset, sizeof(void*));
+					memcpy(&((*entry.first.first)[entry.first.second+offset_replace_addrs]), &((MethodInfo*) entry.second)->offset, sizeof(void*));
 					break;
 				case Field:
-					memcpy(entry.first, &((FieldInfo*) entry.second)->offset, sizeof(void*));
+					memcpy(&((*entry.first.first)[entry.first.second+offset_replace_addrs]), &((FieldInfo*) entry.second)->offset, sizeof(void*));
  					break;
 				case Ctor:
-					memcpy(entry.first, &((ConstructorInfo*) entry.second)->offset, sizeof(void*));
+					memcpy(&((*entry.first.first)[entry.first.second+offset_replace_addrs]), &((ConstructorInfo*) entry.second)->offset, sizeof(void*));
 					break;
 				default: break;
 			}
 		}
 
 		/* THIRD PASS - COPY BYTES OVER */
-		for (auto& entry : dynamic_code)
+		for (auto& entry : dynamic_code) // todo: find other way to do this - this creates a copy of each function's code
 		{
 			void* offset;
 			
