@@ -807,7 +807,7 @@ namespace ULR::IL
 					}
 
 					break;
-				case Call:
+				case Call: // TODO: update unumber of eval stack elements
 					{
 						bool instance = (il[i] == Flags::Instance);
 
@@ -839,8 +839,6 @@ namespace ULR::IL
 						unsigned int space_needed = 0;
 						unsigned int alloc_for_stack_pass = 0;
 						
-						code.insert(code.end(), { 0x48, 0x89, 0xE3 }); // mov rbx, rsp (keep using rsp to push/pop args from eval stack, use rbx as lower stack space to store arg copies)
-
 						if (instance) argsig.insert(argsig.begin(), type);
 
 						unsigned int allocate_for_return = 0;
@@ -858,7 +856,12 @@ namespace ULR::IL
 							locals_size+=allocate_for_return;
 
 							argsig.insert(argsig.begin(), nullptr);
+
+							num_eval_stack_elems+=1; // see below note
 						}
+
+						// WE WILL POP argsig.size() elems off the eval stack and always push one element (retval) to the stack, hence the -(argsig.size()-1) (unless the first arg is a pointer to allocated memory for the return (which has been accounted for in the above block by adding one to num_eval_stack_elems))
+						num_eval_stack_elems-=(argsig.size()-1);
 
 						// TODO: alloc space_needed & somehow prefix the whole operation (maybe use a sub-vector for passing args, then concat)
 						std::vector<byte> argloader;
@@ -974,7 +977,8 @@ namespace ULR::IL
 							argloader.insert(argloader.end(), (byte*) &space_needed, ((byte*) &space_needed)+sizeof(uint32_t));
 
 
-							space_needed+=copy_size;						}
+							space_needed+=copy_size;
+						}
 						else argloader.insert(argloader.end(), { 0x41, 0x58 }); // pop r8
 
 
@@ -1008,16 +1012,22 @@ namespace ULR::IL
 							argloader.insert(argloader.end(), (byte*) &space_needed, ((byte*) &space_needed)+sizeof(uint32_t));
 
 
-							space_needed+=copy_size;						}
+							space_needed+=copy_size;
+						}
 						else argloader.insert(argloader.end(), { 0x41, 0x59 }); // pop r9
 
 						if (argsig.size() == 4) goto callfunction;
 
 						alloc_for_stack_pass = 8*(argsig.size()-4);
 
-						// pass args on stack in reverse order... (technically they alr are in reverse order, maybe just have a separate instr for loading large valuetypes as copies so that you don't need to do any processing here)
-						for (size_t i = argsig.size()-1; i >= 4; i--)
+
+						// pass args on stack in reverse order... (they were passed in reverse order so we can forward them in forward order)
+						for (size_t i = 0; (i+4) < argsig.size(); i++)
 						{
+							unsigned int argoffset = (32+(i-4)*8);
+
+							// r10 is absolute bottom (set in callfunction label), so pass from [r10+32] onwards
+
 							if (NeedsCallAllocatedSpace(argsig[3]))
 							{
 								unsigned int copy_size = argsig[3]->size;
@@ -1042,22 +1052,34 @@ namespace ULR::IL
 
 								// move rbx+space_needed into rax to pass addr to alloc'd space (via lea)
 
+								/*
+									lea rax, [rbx+space_needed]
+								*/
 								argloader.insert(argloader.end(), { 0x48, 0x8D, 0x83 });
 								argloader.insert(argloader.end(), (byte*) &space_needed, ((byte*) &space_needed)+sizeof(uint32_t));
 
 
+								/*
+									mov [r10+argoffset], rax
+								*/
+								argloader.insert(argloader.end(), { 0x49, 0x89, 0x82 });
+								argloader.insert(argloader.end(), (byte*) &argoffset, ((byte*) &argoffset)+sizeof(uint32_t));
+
+
 								space_needed+=copy_size;
+
+								continue;
 							}
-							else argloader.push_back(0x58); // pop rax
 
-							// addr/val to pass in rax
-							// NOTE: think sub rsp, 32 beforehand (placing [rsp+32 as fifth arg correctly])
+							// otherwise just pass normally
 
-							asm volatile(
-								"mov [rsp+%1], %0\n\t"
-								:
-								:"r"(arg), "r"(24+(numargs-i)*8)
-							);
+							/*
+								pop [r10+argoffset]
+							*/
+
+							argloader.insert(argloader.end(), { 0x41, 0x8F, 0x82 });
+							argloader.insert(argloader.end(), (byte*) &argoffset, ((byte*) &argoffset)+sizeof(uint32_t));
+
 						}
 
 						callfunction:
@@ -1069,15 +1091,30 @@ namespace ULR::IL
 							code.insert(code.end(), { 0x48, 0x89, 0xE3, 0x48, 0x81, 0xEB });
 							code.insert(code.end(), (byte*) &space_needed, ((byte*) &space_needed)+sizeof(uint32_t));
 
-							code.insert(code.end(), argloader.begin(), argloader.end());
+							
+							int arg_alloc = -(alloc_for_stack_pass+32); // we need -32 because we start passing stack args at [rsp+32]
 
 							/*
-								mov rsp, rbx
+								lea r10, [rbx+arg_alloc]
 
-								^ set rsp to rbx (end of space allocated) so that new function's frame does not interrupt allocated space
-								the reason rsp was not set in the first place is so that it did not mess up pushing/popping from eval stack
+								arg_alloc is negative, setting r10 to the absolute minimum (largest extent) of stack space allocated for the call
 							*/
-							code.insert(code.end(), { 0x48, 0x89, 0xDC });
+
+							code.insert(code.end(), { 0x4C, 0x8D, 0x93 });
+							code.insert(code.end(), (byte*) &arg_alloc, ((byte*) &arg_alloc)+sizeof(int32_t));
+
+
+							// load function arguments into registers and stack space
+							code.insert(code.end(), argloader.begin(), argloader.end());
+
+
+							/*
+								mov rsp, r10
+
+								set rsp to the minimum of stack space so the new function's frame does not interrupt
+							*/
+
+							code.insert(code.end(), { 0x4C, 0x89, 0xD4 });
 							
 							/*
 								mov rax, 0x0 [addr will be filled later]
@@ -1092,12 +1129,15 @@ namespace ULR::IL
 							code.insert(code.end(), { 0xFF, 0xD0 }); // call rax
 
 							/*
-								add rsp, space_needed
+								add rsp, space_needed-arg_alloc
 
-								^ set rsp to what it was before, restoring the correct eval stack pointer
+								^ set rsp to what it was before, restoring the correct eval stack pointer (arg alloc is negative, so we subtract it from space_needed to increase)
 							*/
+
+							unsigned int total_alloc = space_needed-arg_alloc;
+
 							code.insert(code.end(), { 0x48, 0x81, 0xC4 });
-							code.insert(code.end(), (byte*) &space_needed, ((byte*) &space_needed)+sizeof(uint32_t));
+							code.insert(code.end(), (byte*) &total_alloc, ((byte*) &total_alloc)+sizeof(uint32_t));
 
 							// after the function returns the return value will be in rax (unless the returnvalue is a large value type)
 							
