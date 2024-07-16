@@ -24,7 +24,7 @@ namespace ULR::IL
 
 		size_t i = 0;
 
-		std::map<std::pair<std::vector<byte>*, size_t>, MemberInfo*> replace_addrs;
+		std::map<byte*, MemberInfo*> replace_addrs;
 		std::map<MemberInfo*, std::vector<byte>> dynamic_code;
 
 		/* FIRST PASS - MAP OUT ASSEMBLY METADATA */
@@ -76,7 +76,7 @@ namespace ULR::IL
 		return NoError;
 	}
 
-	CompilationError JITContext::CompleteCompilation(std::map<std::pair<std::vector<byte>*, size_t>, MemberInfo*>& replace_addrs, std::map<MemberInfo*, std::vector<byte>>& dynamic_code, size_t offset_replace_addrs)
+	CompilationError JITContext::CompleteCompilation(std::map<byte*, MemberInfo*>& replace_addrs, std::map<MemberInfo*, std::vector<byte>>& dynamic_code, size_t offset_replace_addrs)
 	{
 		/* THIRD PASS - RESOLVE FUNCTION AND FIELD ADDRS */
 		for (const auto& entry : replace_addrs)
@@ -84,13 +84,13 @@ namespace ULR::IL
 			switch (entry.second->decl_type)
 			{
 				case Method:
-					memcpy(&((*entry.first.first)[entry.first.second+offset_replace_addrs]), &((MethodInfo*) entry.second)->offset, sizeof(void*));
+					memcpy(entry.first, &((MethodInfo*) entry.second)->offset, sizeof(void*));
 					break;
 				case Field:
-					memcpy(&((*entry.first.first)[entry.first.second+offset_replace_addrs]), &((FieldInfo*) entry.second)->offset, sizeof(void*));
+					memcpy(entry.first, &((FieldInfo*) entry.second)->offset, sizeof(void*));
  					break;
 				case Ctor:
-					memcpy(&((*entry.first.first)[entry.first.second+offset_replace_addrs]), &((ConstructorInfo*) entry.second)->offset, sizeof(void*));
+					memcpy(entry.first, &((ConstructorInfo*) entry.second)->offset, sizeof(void*));
 					break;
 				default: break;
 			}

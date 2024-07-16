@@ -117,7 +117,7 @@ namespace ULR::IL
 
 	CompilationError JITContext::CompileType(
 		Assembly* meta_asm,
-		std::map<std::pair<std::vector<byte>*, size_t>, MemberInfo*>& replace_addrs,
+		std::map<byte*, MemberInfo*>& replace_addrs,
 		std::map<MemberInfo*, std::vector<byte>>& dynamic_code,
 		size_t& i, byte il[], byte string_ref[]
 	)

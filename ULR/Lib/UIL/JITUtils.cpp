@@ -22,9 +22,7 @@ namespace ULR::IL
 	{
 		size_t obj_size = sizeof(SystemStringType)+sizeof(int)+(sizeof(char)*len);
 
-		Type** str_obj = (Type**) malloc(obj_size);
-
-		malloc_alloced.push_back(str_obj); // register str_obj's allocation
+		Type** str_obj = (Type**) LogMalloc(obj_size);
 
 		str_obj[0] = SystemStringType;
 
@@ -37,6 +35,15 @@ namespace ULR::IL
 		memcpy(str_obj_offset_for_char_copy, str, len*sizeof(char));
 
 		return (char*) str_obj;
+	}
+
+	byte* JITContext::LogMalloc(size_t size)
+	{
+		void* ptr = malloc(size);
+
+		malloc_alloced.push_back(ptr);
+
+		return (byte*) ptr;
 	}
 
 	JITContext::~JITContext()

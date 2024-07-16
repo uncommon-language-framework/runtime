@@ -9,7 +9,7 @@ namespace ULR::IL
 		unsigned int& locals_size,
 		unsigned int copy_to_rbp_offset_for_return,
 		Type* rettype,
-		std::map<std::pair<std::vector<byte>*, size_t>, MemberInfo*>& replace_addrs,
+		std::map<byte*, MemberInfo*>& replace_addrs,
 		Helpers::LocalLookupTable& locals,
 		Helpers::LocalLookupTable& apls,
 		std::vector<byte>& code, size_t& i,
@@ -622,63 +622,83 @@ namespace ULR::IL
 
 							if ((field->valtype->decl_type == TypeType::Struct) && (field->valtype->size != 8)) // unfriendly struct types
 							{
+								byte* filled_later;
+
 								switch (field->valtype->size)
 								{
 									case 1:
 										/*
-											mov rax, 0x0 (addr filled later)
+											mov rax, [filled_later]
 											movzx rax, byte ptr [rax]
 										*/
-										code.insert(code.end(), { 0x48, 0xB8 }); // mov rax,
+										code.insert(code.end(), { 0x48, 0xA1 }); // mov rax,
 
-										replace_addrs[std::pair<std::vector<byte>*, size_t>(&code, code.size())] = field;
+										filled_later = LogMalloc(sizeof(void*));
 
-										code.insert(code.end(), sizeof(void*), 0); // 0x0 (address will be filled later)
+										replace_addrs[filled_later] = field;
+
+										code.insert(code.end(), (byte*) &filled_later, ((byte*) &filled_later)+sizeof(byte*)); // 0x0 (address will be filled later)
 
 										code.insert(code.end(), { 0x48, 0x0F, 0xB6, 0x00 }); // movzx rax, byte ptr [rax]
 										break;
 									case 2:
 										/*
-											mov rax, 0x0 (addr filled later)
+											mov rax, [filled_later]
 											movzx rax, word ptr [rax]
 										*/
 
-										code.insert(code.end(), { 0x48, 0xB8 }); // mov rax,
+										code.insert(code.end(), { 0x48, 0xA1 }); // mov rax,
 
-										replace_addrs[std::pair<std::vector<byte>*, size_t>(&code, code.size())] = field;
+										filled_later = LogMalloc(sizeof(void*));
 
-										code.insert(code.end(), sizeof(void*), 0); // 0x0 (address will be filled later)
+										replace_addrs[filled_later] = field;
+
+										code.insert(code.end(), (byte*) &filled_later, ((byte*) &filled_later)+sizeof(byte*)); // 0x0 (address will be filled later)
 
 										code.insert(code.end(), { 0x48, 0x0F, 0xB7, 0x00 }); // movzx rax, byte ptr [rax]										
 										break;
 									case 4:
 										/*
-											mov eax, [0x0] (addr filled later)
+											mov rax, [filled_later]
+											mov rax, [rax]
 										*/
+										code.insert(code.end(), { 0x48, 0xA1, }); // mov rax,
 
-										code.push_back(0xA1); // mov eax,
-										
-										replace_addrs[std::pair<std::vector<byte>*, size_t>(&code, code.size())] = field;
+										filled_later = LogMalloc(sizeof(void*));
 
-										code.insert(code.end(), sizeof(void*), 0); // [0x0] (address will be filled later)
+										replace_addrs[filled_later] = field;
+
+										code.insert(code.end(), (byte*) &filled_later, ((byte*) &filled_later)+sizeof(byte*)); // [filled_later]
+
+										code.insert(code.end(), { 0x8B, 0x00 }); // mov eax, [rax]
 										break;
 									default:
-										code.insert(code.end(), { 0x48, 0xB8 }); // mov, rax
+										code.insert(code.end(), { 0x48, 0xA1 }); // mov, rax
 
-										replace_addrs[std::pair<std::vector<byte>*, size_t>(&code, code.size())] = field;
+										filled_later = LogMalloc(sizeof(void*));
 
-										code.insert(code.end(), sizeof(void*), 0); // 0x0 (address will be filled later)
+										replace_addrs[filled_later] = field;
+
+										code.insert(code.end(), (byte*) &filled_later, ((byte*) &filled_later)+sizeof(byte*)); // 0x0 (address will be filled later)
 										break;
 								}
 
 							}
 							else // reference types and 8-byte struct types
 							{
+								/*
+									mov rax, [filled_later]
+									mov rax, [rax]
+								*/
 								code.insert(code.end(), { 0x48, 0xA1, }); // mov rax,
 
-								replace_addrs[std::pair<std::vector<byte>*, size_t>(&code, code.size())] = field;
+								byte* filled_later = LogMalloc(sizeof(void*));
 
-								code.insert(code.end(), sizeof(void*), 0); // [0x0] (address will be filled later)
+								replace_addrs[filled_later] = field;
+
+								code.insert(code.end(), (byte*) &filled_later, ((byte*) &filled_later)+sizeof(byte*)); // [filled_later]
+
+								code.insert(code.end(), { 0x48, 0x8B, 0x00 }); // mov rax, [rax]
 							}
 						}
 						else if (binding == Flags::Instance)
@@ -1088,7 +1108,7 @@ namespace ULR::IL
 								notice the minus; this is why negation is below
 							*/
 
-							int space_needed_neg = -(space_needed+argsig.size()*8);
+							int space_needed_neg = -(space_needed);
 
 							code.insert(code.end(), { 0x48, 0x8D, 0x9C, 0x24 });
 							code.insert(code.end(), (byte*) &space_needed_neg, ((byte*) &space_needed_neg)+sizeof(uint32_t));
@@ -1130,14 +1150,17 @@ namespace ULR::IL
 							}
 							
 							/*
-								mov rax, 0x0 [addr will be filled later]
+								mov rax, [filled_later]
 							*/
 
-							code.insert(code.end(), { 0x48, 0xB8 });
+							code.insert(code.end(), { 0x48, 0xA1, }); // mov rax,
 
-							replace_addrs[std::pair<std::vector<byte>*, size_t>(&code, code.size())] = method;
+							byte* filled_later = LogMalloc(sizeof(void*));
 
-							code.insert(code.end(), sizeof(void*), 0);
+							replace_addrs[filled_later] = method;
+
+							code.insert(code.end(), (byte*) &filled_later, ((byte*) &filled_later)+sizeof(byte*)); // [filled_later]
+
 
 							code.insert(code.end(), { 0xFF, 0xD0 }); // call rax
 
