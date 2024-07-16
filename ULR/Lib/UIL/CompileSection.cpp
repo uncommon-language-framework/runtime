@@ -1148,21 +1148,38 @@ namespace ULR::IL
 
 								code.insert(code.end(), { 0x48, 0x83, 0xEC, 0x08 }); // sub rsp, 8
 							}
-							
-							/*
-								mov rax, [filled_later]
-							*/
 
-							code.insert(code.end(), { 0x48, 0xA1, }); // mov rax,
 
 							byte* filled_later = LogMalloc(sizeof(void*));
 
 							replace_addrs[filled_later] = method;
 
-							code.insert(code.end(), (byte*) &filled_later, ((byte*) &filled_later)+sizeof(byte*)); // [filled_later]
+							if (((long long) filled_later) < UINT32_MAX) // 1: we can use long long instead of intptr_t because we know this is an x64 JIT; 2: if this fits in a uint32 we can use a shorter call [addr] instruction
+							{
+								/*
+									call qword ptr [filled_later]
+								*/
+								code.insert(code.end(), { 0xFF, 0x14, 0x25 }); // call qword ptr
+
+								uint32_t as_u32 = (uint32_t) (intptr_t) filled_later;
+
+								code.insert(code.end(), (byte*) &as_u32, ((byte*) &as_u32)+sizeof(uint32_t)); // [filled_later]
+							}
+							else // longer instr
+							{
+
+								/*
+									mov rax, [filled_later]
+									call rax
+								*/
+
+								code.insert(code.end(), { 0x48, 0xA1, }); // mov rax,
+
+								code.insert(code.end(), (byte*) &filled_later, ((byte*) &filled_later)+sizeof(byte*)); // [filled_later]
 
 
-							code.insert(code.end(), { 0xFF, 0xD0 }); // call rax
+								code.insert(code.end(), { 0xFF, 0xD0 }); // call rax
+							}
 
 							/*
 								add rsp, space_needed-arg_alloc

@@ -24,3 +24,5 @@
 	- Add jmp instrs
 	- Attach vtable calls to method names somehow for jit compilation (e.g. create a mapping between name and number)
 - TODO: pad all valuetypes to 8 bytes upon loading
+- TODO: have JIT auto-create `this` as first arg for instance methods
+- TODO: have JIT cache the postfill buffers so redundant ones are not allocated
