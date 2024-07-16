@@ -1102,51 +1102,101 @@ namespace ULR::IL
 						}
 
 						callfunction:
-							/*
-								lea rbx, [rsp-space_needed]
-
-								notice the minus; this is why negation is below
-							*/
+							unsigned int arg_alloc = argsig.size() <= 4 ? 32-(argsig.size()*8) : 0;
+							int arg_alloc_neg = -arg_alloc;
 
 							int space_needed_neg = -(space_needed);
 
-							code.insert(code.end(), { 0x48, 0x8D, 0x9C, 0x24 });
-							code.insert(code.end(), (byte*) &space_needed_neg, ((byte*) &space_needed_neg)+sizeof(uint32_t));
+							if (space_needed)
+							{
+								/*
+									lea rbx, [rsp-space_needed]
+
+									notice the minus; this is why negation is below
+								*/
 
 
-							int arg_alloc = -(argsig.size()*8);
+								code.insert(code.end(), { 0x48, 0x8D, 0x9C, 0x24 });
+								code.insert(code.end(), (byte*) &space_needed_neg, ((byte*) &space_needed_neg)+sizeof(uint32_t));
+
+
+								if (arg_alloc)
+								{
+									/*
+										lea r10, [rbx-arg_alloc]
+
+										setting r10 to the absolute minimum (largest extent) of stack space allocated for the call argss
+									*/
+
+									code.insert(code.end(), { 0x4C, 0x8D, 0x93 });
+									code.insert(code.end(), (byte*) &arg_alloc_neg, ((byte*) &arg_alloc_neg)+sizeof(int32_t));
+								}
+							}
+							else if (arg_alloc)
+							{
+								/*
+									lea r10, [rsp-arg_alloc]
+								*/
+								code.insert(code.end(), { 0x4C, 0x8D, 0x94, 0x24 });
+								code.insert(code.end(), (byte*) &arg_alloc_neg, ((byte*) &arg_alloc_neg)+sizeof(int32_t));
+							}
+							else
+							{
+								code.insert(code.end(), { 0x48, 0x89, 0xE3 }); // mov rbx, rsp
+							}
+
 							
-							/*
-								lea r10, [rbx-arg_alloc]
-
-								setting r10 to the absolute minimum (largest extent) of stack space allocated for the call argss
-							*/
-
-							code.insert(code.end(), { 0x4C, 0x8D, 0x93 });
-							code.insert(code.end(), (byte*) &arg_alloc, ((byte*) &arg_alloc)+sizeof(int32_t));
-
 
 							// load function arguments into registers and stack space
 							code.insert(code.end(), argloader.begin(), argloader.end());
 
-
-							/*
-								mov rsp, r10
-
-								set rsp to the minimum of stack space so the new function's frame does not interrupt
-							*/
-
-							code.insert(code.end(), { 0x4C, 0x89, 0xD4 });
-
-							// align stack to 16 bytes
-
-							bool align8 = false;
+							bool align8 = false; // stack must be aligned to 16 bytes
 
 							if (num_eval_stack_elems % 2 != 0)
 							{
 								align8 = true;
 
-								code.insert(code.end(), { 0x48, 0x83, 0xEC, 0x08 }); // sub rsp, 8
+								if (arg_alloc)
+								{
+									/*
+										lea rsp, [r10-8]
+
+										set rsp to the minimum of stack space so the new function's frame does not interrupt
+									*/
+
+									code.insert(code.end(), { 0x49, 0x8D, 0x62, 0xF8 });
+								}
+								else
+								{
+									/*
+										lea rsp, [rbx-8]
+
+										set rsp to the minimum of stack space so the new function's frame does not interrupt
+									*/
+									code.insert(code.end(), { 0x48, 0x8D, 0x63, 0xF8 });
+								}
+							}
+							else
+							{
+								if (arg_alloc)
+								{
+									/*
+										mov rsp, r10
+
+										set rsp to the minimum of stack space so the new function's frame does not interrupt
+									*/
+
+									code.insert(code.end(), { 0x4C, 0x89, 0xD4 });
+								}
+								else
+								{
+									/*
+										mov rsp, rbx
+
+										set rsp to the minimum of stack space so the new function's frame does not interrupt
+									*/
+									code.insert(code.end(), { 0x48, 0x89, 0xDC });
+								}								
 							}
 
 
@@ -1182,42 +1232,22 @@ namespace ULR::IL
 							}
 
 							/*
-								add rsp, space_needed-arg_alloc
-
-								^ set rsp to what it was before, restoring the correct eval stack pointer (arg alloc & space_needed_neg are negative, so we negate for increase)
-							*/
-
-							unsigned int total_alloc = -(space_needed_neg+arg_alloc);
-
-							code.insert(code.end(), { 0x48, 0x81, 0xC4 });
-							code.insert(code.end(), (byte*) &total_alloc, ((byte*) &total_alloc)+sizeof(uint32_t));
-
-							if (align8)
-							{
-								code.insert(code.end(), { 0x48, 0x83, 0xC4, 0x08 }); // add rsp, 8
-							}
-
-							/*
-								add rsp, argsig.size()*8
+								add rsp, total_alloc+stack_elevation+alignment
 
 								rbp & r10 were set before argsig.size() elems were popped off the eval stack, so resp is argsig.size() elems artifically lower than it should be
 							*/
 
+							unsigned int total_alloc = -(space_needed_neg+arg_alloc_neg); // negating these two negative vals after adding will make the whole thing positive
+
 							unsigned int stack_elevation = argsig.size()*8;
 
-							code.insert(code.end(), { 0x48, 0x81, 0xC4 });
-							code.insert(code.end(), (byte*) &stack_elevation, ((byte*) &stack_elevation)+sizeof(uint32_t));
+							unsigned int total_add_to_rsp = total_alloc+stack_elevation+(align8*8);
 
-							// after the function returns the return value will be in rax (unless the returnvalue is a large value type)
-							
-							if (allocate_for_return)
-							{
-								/*
-									lea rax, [rbp+retval_allocated_rbp_offset]
-								*/
-								code.insert(code.end(), { 0x48, 0x8D, 0x85 });
-								code.insert(code.end(), (byte*) &retval_allocated_rbp_offset, ((byte*) &retval_allocated_rbp_offset)+sizeof(uint32_t));
-							}
+							code.insert(code.end(), { 0x48, 0x81, 0xC4 });
+							code.insert(code.end(), (byte*) &total_add_to_rsp, ((byte*) &total_add_to_rsp)+sizeof(uint32_t));
+
+							// after the function returns the return value will be in rax
+							// NOTE: even if allocate_for_return is set, this will still work since the ABI mandates that the callee should return the same pointer allocated in rax
 
 							code.push_back(0x50); // push rax (push retval to eval stack)
 

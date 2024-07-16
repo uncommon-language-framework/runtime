@@ -26,3 +26,5 @@
 - TODO: pad all valuetypes to 8 bytes upon loading
 - TODO: have JIT auto-create `this` as first arg for instance methods
 - TODO: have JIT cache the postfill buffers so redundant ones are not allocated
+	- Another memory opt -- since we have to allocate full pages anyway, maybe try to fit multiple functions on one page
+- NOTE: MethodInfo::Invoke and JIT are not compatible with return values case 2 [here](https://learn.microsoft.com/en-us/cpp/build/x64-calling-convention?view=msvc-170#example-of-return-value-2---128-bit-result) (probably won't fix)
