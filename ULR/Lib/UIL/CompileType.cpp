@@ -320,6 +320,10 @@ namespace ULR::IL
 							break;
 					}
 				}
+				
+				// Align locals_size to 16 bytes
+
+				locals_size+=(locals_size % 16);
 
 				while (il[i] == BeginSection)
 				{

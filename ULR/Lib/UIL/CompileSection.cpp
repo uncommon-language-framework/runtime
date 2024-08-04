@@ -874,7 +874,9 @@ namespace ULR::IL
 
 							retval_allocated_rbp_offset = locals_size;
 
-							locals_size+=allocate_for_return;
+							// use allocate_for_return+(allocate_for_return % 16 to ensure that the stack remains aligned to 16 bytes)
+
+							locals_size+=allocate_for_return+(allocate_for_return % 16);
 
 							argsig.insert(argsig.begin(), nullptr);
 
@@ -1101,11 +1103,11 @@ namespace ULR::IL
 
 						}
 
-						callfunction:
+						callfunction: // NOTE: take a look at the emitted asm for the JITCall test, the two lea instrs can be optimized/consolidated
 							unsigned int arg_alloc = argsig.size() <= 4 ? 32-(argsig.size()*8) : 0;
-							int arg_alloc_neg = -arg_alloc;
+							int arg_alloc_neg = -(arg_alloc+(arg_alloc % 16)); // & 16 to align to 16 bytes
 
-							int space_needed_neg = -(space_needed);
+							int space_needed_neg = -(space_needed+(space_needed % 16)); // % 16 to align to 16 bytes
 
 							if (space_needed)
 							{
@@ -1152,7 +1154,7 @@ namespace ULR::IL
 
 							bool align8 = false; // stack must be aligned to 16 bytes
 
-							if (num_eval_stack_elems % 2 != 0)
+							if (num_eval_stack_elems % 2 != 0) // stack is one off (retval has not been pushed yet but elem math was done above), but since we save two registers the two 8 byte offsets cancel out into 16 byte alignment leaving us with an even element number checking expression that works but not for the reason that it seems
 							{
 								align8 = true;
 
