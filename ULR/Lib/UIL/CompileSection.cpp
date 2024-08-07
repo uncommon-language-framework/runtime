@@ -7,6 +7,7 @@ namespace ULR::IL
 	// sections should not pop anything off of the evaluation stack that they did not push on to it (either directly or indirectly)
 	CompilationError JITContext::CompileSection(
 		unsigned int& locals_size,
+		unsigned int& recyclable_stack_space,
 		unsigned int copy_to_rbp_offset_for_return,
 		Type* rettype,
 		std::map<byte*, MemberInfo*>& replace_addrs,
@@ -820,7 +821,7 @@ namespace ULR::IL
 						/*
 							push [rbp+offset]
 
-							even in the apl is a large struct, the address to memory allocated by the caller would have been passed in args so this will load the address properly
+							even if the apl is a large struct, the address to memory allocated by the caller would have been passed in args so this will load the address properly
 						*/
 						code.insert(code.end(), { 0xFF, 0xB5 });
 						code.insert(code.end(), (byte*) &apl.offset, ((byte*) &apl.offset)+sizeof(uint32_t));
@@ -863,7 +864,7 @@ namespace ULR::IL
 						if (instance) argsig.insert(argsig.begin(), type);
 
 						unsigned int allocate_for_return = 0;
-						unsigned int retval_allocated_rbp_offset = 0;
+						int retval_allocated_rbp_offset = 0;
 
 						// we will need to allocate from prolog/epilog since this memory needs to last
 						if (NeedsCallAllocatedSpace(method->rettype))
@@ -872,11 +873,13 @@ namespace ULR::IL
 
 							// TODO: pass alloc'd as first arg & set retval_allocated_rbp_offset
 
-							retval_allocated_rbp_offset = locals_size;
+							retval_allocated_rbp_offset = -locals_size; // make sure this is negative because our stackvars are located at [rbp-offset]
 
-							// use allocate_for_return+(allocate_for_return % 16 to ensure that the stack remains aligned to 16 bytes)
+							// recyclable stack space and locals_size are aligned to 16 bytes after all sections are compiled so we don't need to worry about that
+							// use recyclable stack space instead of locals_size to not waste space
 
-							locals_size+=allocate_for_return+(allocate_for_return % 16);
+							// ensure recyclable stack space is large enough to hold this
+							recyclable_stack_space = std::max(recyclable_stack_space, allocate_for_return);
 
 							argsig.insert(argsig.begin(), nullptr);
 
@@ -892,6 +895,8 @@ namespace ULR::IL
 						// do first four args (register-passed)
 
 						if (argsig.size() == 0) goto callfunction;
+
+						// TODO: have all NeedsCallAllocatedSpace args be allocated in recyclable_stack_space (to reduce add & sub calls)
 
 						if (allocate_for_return) // if we need to allocate for return val, then the pointer to the allocated space must be passed as the first argument
 						{
@@ -1145,16 +1150,14 @@ namespace ULR::IL
 							else
 							{
 								code.insert(code.end(), { 0x48, 0x89, 0xE3 }); // mov rbx, rsp
-							}
-
-							
+							}							
 
 							// load function arguments into registers and stack space
 							code.insert(code.end(), argloader.begin(), argloader.end());
 
 							bool align8 = false; // stack must be aligned to 16 bytes
 
-							if (num_eval_stack_elems % 2 != 0) // stack is one off (retval has not been pushed yet but elem math was done above), but since we save two registers the two 8 byte offsets cancel out into 16 byte alignment leaving us with an even element number checking expression that works but not for the reason that it seems
+							if (num_eval_stack_elems % 2 != 0) // stack is one off (retval has not been pushed yet but elem math was done above), but since we save two registers the two 8 byte offsets cancel out into 16 byte alignment leaving us with an even element number checking expression that works but not for the reason that it seems it should work for
 							{
 								align8 = true;
 
@@ -1254,6 +1257,95 @@ namespace ULR::IL
 							code.push_back(0x50); // push rax (push retval to eval stack)
 
 							break;
+					}
+				case StFld: // TODO: complete impl
+					num_eval_stack_elems-=1; // net change
+
+					i++;
+
+					{
+						Flags binding = (Flags) il[i];
+
+						i++;
+
+						if (binding == Flags::Static)
+						{
+							std::string_view type_name = LookupString(&il[i], string_ref);
+
+							i+=4; // from string ref
+
+							std::string_view field_name = LookupString(&il[i], string_ref);
+
+							i+=4; // from string ref
+
+							FieldInfo* field = (FieldInfo*) api->GetType(type_name)->static_attrs[field_name][0];
+
+							if ((field->valtype->decl_type == TypeType::Struct) && (field->valtype->size != 8)) // unfriendly struct types
+							{
+								byte* filled_later;
+
+								switch (field->valtype->size)
+								{
+									case 1:
+
+										break;
+									case 2:
+								
+										break;
+									case 4:
+
+										break;
+									default:
+
+										break;
+								}
+
+							}
+							else // reference types and 8-byte struct types
+							{
+
+							}
+						}
+						else if (binding == Flags::Instance)
+						{
+							std::string_view type_name = LookupString(&il[i], string_ref);
+
+							i+=4; // from string ref
+
+							std::string_view field_name = LookupString(&il[i], string_ref);
+
+							i+=4; // from string ref
+
+							FieldInfo* field = (FieldInfo*) api->GetType(type_name)->static_attrs[field_name][0];
+
+							// pop the object from the eval stack, add the offset & dereference
+
+							uint32_t offset = (uint32_t) ((intptr_t) field->offset);
+
+							if ((field->valtype->decl_type == TypeType::Struct) && (field->valtype->size != 8)) // unfriendly struct types
+							{
+								switch (field->valtype->size)
+								{
+									case 1:
+										
+										break;
+									case 2:
+										
+										break;
+									case 4:
+										
+										break;
+									default:
+
+										break;
+								}
+
+							}
+							else // reference types and 8-byte struct types
+							{
+
+							}
+						}
 					}
 				case StLoc:
 					num_eval_stack_elems-=1; // net change
@@ -1358,8 +1450,6 @@ namespace ULR::IL
 				case Ret:
 					i++;
 
-					// TODO: see below, think about ret, num_eval_stack_elems needs to be based on scope/branches taken
-
 					num_eval_stack_elems-=1; // net change
 
 					code.push_back(0x58); // pop rax (last thing on the evaluation stack gets returned)
@@ -1403,10 +1493,18 @@ namespace ULR::IL
 					// ret
 
 					{
-						unsigned int add_to_rsp = locals_size+(num_eval_stack_elems*8);
+						unsigned int alloced_from_rsp = locals_size+recyclable_stack_space;
 
-						code.insert(code.end(), { 0x48, 0x81, 0xC4 });
-						code.insert(code.end(), (byte*) &add_to_rsp, ((byte*) &add_to_rsp)+sizeof(uint32_t));
+						alloced_from_rsp+=(alloced_from_rsp % 16); // align to 16 bytes
+
+						unsigned int add_to_rsp = alloced_from_rsp+(num_eval_stack_elems*8);
+						
+						if (add_to_rsp)
+						{
+							code.insert(code.end(), { 0x48, 0x81, 0xC4 });
+							code.insert(code.end(), (byte*) &add_to_rsp, ((byte*) &add_to_rsp)+sizeof(uint32_t));
+						}
+
 						code.insert(code.end(), { 0x5D, 0x5B, 0xC3 }); // pop rbp, pop rbx, ret
 					}
 

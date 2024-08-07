@@ -2,8 +2,16 @@
 
 namespace ULR::IL
 {
+
+	inline void JITContext::EnsureInitialized()
+	{
+		if (!this->SystemStringType) this->SystemStringType = api->GetType("[System]String", "System.Runtime.Native.dll");
+	}
+
 	CompilationError JITContext::ReadTypeMeta(Assembly* meta_asm, size_t& i, byte il[], byte string_ref[])
 	{
+		EnsureInitialized();
+
 		TypeType decl_type = (TypeType) il[i];
 
 		i++;
@@ -191,7 +199,7 @@ namespace ULR::IL
 				Helpers::LocalLookupTable locals;
 				Helpers::LocalLookupTable argpassedlocals;
 				unsigned int locals_size = 0;
-				unsigned int num_eval_stack_elems = 0;
+				unsigned int recyclable_stack_space = 0;
 
 				unsigned int copy_to_rbp_offset_for_return = 0;
 
@@ -321,16 +329,13 @@ namespace ULR::IL
 					}
 				}
 				
-				// Align locals_size to 16 bytes
-
-				locals_size+=(locals_size % 16);
-
-				while (il[i] == BeginSection)
+				while (il[i] == BeginSection) // todo log section start bytes num for section jumping
 				{
 					i++; // skip BeginSection signal
 
 					auto error = CompileSection(
 						locals_size,
+						recyclable_stack_space,
 						copy_to_rbp_offset_for_return,
 						rettype,
 						replace_addrs,
@@ -348,14 +353,18 @@ namespace ULR::IL
 				if (il[i] != EndMethod) return { "Expected EndMethod signal!", CompilationError::ErrorCode::SignalExpected, &il[i] };
 
 				i++; // skip EndMethod
+
+				unsigned int alloc_from_stack = locals_size+recyclable_stack_space;
+
+				alloc_from_stack+=(alloc_from_stack % 16); // align to 16 bytes
 				
 				// the three lines below insert the prolog (in reverse order visually but forward order in reality)
 				// push rbx
 				// push rbp
 				// mov rbp, rsp
-				// sub rsp, locals_size
+				// sub rsp, alloc_from_stack
 
-				code.insert(code.begin(), (byte*) &locals_size, ((byte*) &locals_size)+sizeof(uint32_t)); // 4 bytes
+				code.insert(code.begin(), (byte*) &alloc_from_stack, ((byte*) &alloc_from_stack)+sizeof(uint32_t)); // 4 bytes
 				code.insert(code.begin(), { 0x53, 0x55, 0x48, 0x89, 0xE5, 0x48, 0x81, 0xEC }); // 8 bytes
 
 				// ^ twelve byte total epilog
@@ -363,15 +372,15 @@ namespace ULR::IL
 				// right now there is no good permanent soln, a constant 12 bytes is being used in JITCompile.cpp
 
 				// epilog
-				// add rsp, locals_size
+				// add rsp, alloc_from_stack
 				// pop rbp
 				// POP rbx
 				// ret
 
-				unsigned int add_to_rsp = locals_size+(num_eval_stack_elems*8);
+				// no need to add anything for eval stack elems since CompileSection takes care of that
 
 				code.insert(code.end(), { 0x48, 0x81, 0xC4 });
-				code.insert(code.end(), (byte*) &add_to_rsp, ((byte*) &add_to_rsp)+sizeof(uint32_t));
+				code.insert(code.end(), (byte*) &alloc_from_stack, ((byte*) &alloc_from_stack)+sizeof(uint32_t));
 				code.insert(code.end(), { 0x5D, 0x5B, 0xC3 }); // pop rbp, pop rbx, ret
 
 				void* funcaddr = VirtualAlloc(NULL, code.size(), MEM_COMMIT, PAGE_READWRITE);

@@ -80,42 +80,44 @@ namespace ULR::IL
 		Or,
 		Not,
 		Xor,
-		CstNV,
+		CstNV, // Cast Numerical Value
 		LdStr, // to fix GC problem with ldstr, maybe allocate separately (on own) & delete at the end of JITContext
-		LdNC,
-		LdFld,
-		LdLoc,
-		LdAPL,
-		LdElem,
-		LdITO, // may remove, probably useless
-		LdETO, // may remove, may not be feasible (also same GC problem?)
-		VTSCp, // ValueType Stack Copy
+		LdNC, // load numerical constant
+		LdFld, // load field
+		LdLoc, // load local
+		LdAPL, // load argument-passed local
+		LdElem, // load element
+		LdITO, // may remove, probably useless [load internal type object]
+		LdETO, // may remove, may not be feasible (also same GC problem?) [load external type object]
+		LdLst, // load last - pushes the most recently popped item back onto the evaluation stack (this is only guaranteed to work after a StXXX instruction and cannot be used successively)
+		VTSCp, // ValueType Stack Copy [may remove - find uses?]
 		Call,
 		Box,
 		UnBox,
-		VCall,
-		StFld,
-		StLoc,
-		StAPL,
-		StElem,
-		New,
-		NewArr,
+		VCall, // virtual call
+		StFld, // store field
+		StLoc, // store local
+		StAPL, // store argument-passed local
+		StElem, // store element
+		AllocS, // allocate (but don't initialize) new object [short lifetime - until next valtype allocation by Call/VCall or AllocS]
+		AllocL, // allocate (but don't initialize) new object [long lifetime]
+		NewArr, // create array
 		Ret,
 		
 		/* Jumping Instructions */
-		Jmp,
-		JNE,
-		JEq,
-		JLT,
-		JGT,
-		JLU,
-		JGU,
-		JLE,
-		JGE,
-		JLEU,
-		JGEU,
-		JTr,
-		JFl,
+		Jmp, // jump
+		JNE, // jump if not eq
+		JEq, // jump if eq
+		JLT, // jump if less than
+		JGT, // jump if greater than
+		JLU, // jump if less than (unsigned)
+		JGU, // jump if greater than (unsigned)
+		JLE, // jump if less than or eq
+		JGE, // jump if greater than or eq
+		JLEU, // jump ig less than or eq (unsigned)
+		JGEU, // jump if greater than or eq (unsigned)
+		JNZ, // jump if truthy/nonzero (e.g != 0)
+		JEqZ, // jump if false (e.g. == 0)
 
 		/* Below are UIL signals, used to section code */
 		BeginType,
@@ -137,8 +139,7 @@ namespace ULR::IL
 	{
 		Static,
 		Instance,
-		LocalVariable,
-		Native
+		Ctor
 	};
 
 	enum NumericalTypeIdentifier : byte
@@ -162,6 +163,8 @@ namespace ULR::IL
 		std::vector<void*> malloc_alloced;
 		Resolver::ULRAPIImpl* api;
 		Type* SystemStringType;
+
+		void EnsureInitialized();
 
 		public:
 			JITContext(Resolver::ULRAPIImpl* api);
@@ -190,8 +193,10 @@ namespace ULR::IL
 			);
 			CompilationError CompileGenericType(Assembly* meta_asm, size_t& i, byte il[], byte string_ref[], Type* (*ResolveGenericLookup)(byte));
 			
+			// CompileSection -> CompileMethodBodySection
 			CompilationError CompileSection( // TODO: refactor so that this just maps to a CompileGenericSection call with no generic resolver passed
 				unsigned int& locals_size,
+				unsigned int& recyclable_stack_space,
 				unsigned int copy_to_rbp_offset_for_return,
 				Type* rettype,
 				std::map<byte*, MemberInfo*>& replace_addrs,

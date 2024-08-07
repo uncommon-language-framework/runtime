@@ -1,7 +1,9 @@
 #include "../Resolver.hpp"
+#include "../UIL.hpp"
 #include <dbghelp.h>
 #include <winternl.h>
 #include <sstream>
+#include <fstream>
 
 #define COLOR_INTEGER "\u001b[1m" // bold actually
 #define COLOR_TYPE_GREEN "\u001b[92m"
@@ -33,6 +35,7 @@ namespace ULR::Resolver
 		this->LoadAssemblyPtr = LoadAssembly;
 		this->ReadAssemblyPtr = ReadAssembly;
 		this->PopulateVtablePtr = PopulateVtable;
+		this->jit = new IL::JITContext(this);
 
 		if (debugger)
 		{
@@ -79,6 +82,56 @@ namespace ULR::Resolver
 		ReadAssemblyPtr(namecpp.c_str());
 
 		return LoadAssemblyPtr(namecpp.c_str(), this);
+	}
+
+	Assembly* ULRAPIImpl::LoadJITAssembly(std::string jitasm_path) // todo: load jit deps
+	{
+		char* asm_basename = strdup(jitasm_path.substr(jitasm_path.find_last_of("/\\") + 1).c_str());
+
+		Assembly* meta_asm = new Assembly(asm_basename, strdup(jitasm_path.c_str()), nullptr, 0, nullptr, nullptr, nullptr);
+
+		std::ifstream f(jitasm_path, std::ios::binary);
+
+		f.seekg(0, std::ios::end);
+		
+		auto size = f.tellg();
+
+		f.seekg(0, std::ios::beg);
+
+		byte* ilbuf = new byte[size];
+
+		f.read((char*) ilbuf, size);
+
+		// TODO: error checking
+
+		int text_size = *((int*) ilbuf);
+
+		byte* il = ilbuf+sizeof(unsigned int);
+		byte* string_ref = il+text_size;
+
+		auto err = jit->Compile(meta_asm, il, string_ref);
+
+		if (err)
+		{
+			std::cerr
+				<< "Could not load assembly: "
+				<< "ULR JIT Error: "
+				<< err.error
+				<< " at byte ["
+				<< (void*) err.byte_at
+				<< "] (il["
+				<< (size_t) (err.byte_at-il)
+				<< "]) value: "
+				<< (int) *err.byte_at
+				<< '\n';
+
+			return nullptr;
+		}
+
+		read_assemblies->at(meta_asm->name) = meta_asm;
+		assemblies->at(meta_asm->name) = meta_asm;
+
+		return meta_asm;
 	}
 
 	Assembly* ULRAPIImpl::LocateAssembly(std::string_view assembly_name)

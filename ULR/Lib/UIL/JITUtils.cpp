@@ -5,7 +5,6 @@ namespace ULR::IL
 	JITContext::JITContext(Resolver::ULRAPIImpl* api)
 	{
 		this->api = api;
-		this->SystemStringType = api->GetType("[System]String", "System.Runtime.Native.dll");
 	}
 
 	std::string_view JITContext::LookupString(byte il_of_string_ref[], byte string_ref[]) // every string reference takes four bytes - two to specify the offset from string_ref and two to specify the length of the string
