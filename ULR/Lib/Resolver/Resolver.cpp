@@ -24,10 +24,11 @@ namespace ULR::Resolver
 	ULRAPIImpl::ULRAPIImpl(
 		std::map<std::string_view, Assembly*>* assemblies,
 		std::map<std::string_view, Assembly*>* read_assemblies,
-		HMODULE (*ReadAssembly)(const char name[]),
-		Assembly* (*LoadAssembly)(const char name[], ULRAPIImpl* api),
+		ULRResult<HMODULE> (*ReadAssembly)(const char name[]),
+		ULRResult<Assembly*> (*LoadAssembly)(const char name[], ULRAPIImpl* api),
 		void (*PopulateVtable)(Type* type),
-		HMODULE debugger
+		HMODULE debugger,
+		bool& debugger_load_successful
 	)
 	{
 		this->assemblies = assemblies;
@@ -40,16 +41,18 @@ namespace ULR::Resolver
 		if (debugger)
 		{
 			void (*InitDebugger)(ULRAPIImpl*) = (void (*)(ULRAPIImpl*)) GetProcAddress(debugger, "InitDebugger");
+			StaticDebug = (void (*)(StaticDebugInfo&)) GetProcAddress(debugger, "StaticDebug");
 
-			if (!InitDebugger)
+			if (!InitDebugger || !StaticDebug)
 			{
-				std::cerr << "Failed to load debugger!\n";
-				exit(1);
+				debugger_load_successful = false;
+
+				return;
 			}
 
 			InitDebugger(this);
 
-			StaticDebug = (void (*)(StaticDebugInfo&)) GetProcAddress(debugger, "StaticDebug");
+			debugger_load_successful = true;
 		}
 	}
 
@@ -76,12 +79,12 @@ namespace ULR::Resolver
 		{
 			if (assemblies->count(assembly_name)) return assemblies->at(assembly_name);
 
-			return LoadAssemblyPtr(namecpp.c_str(), this);
+			return LoadAssemblyPtr(namecpp.c_str(), this).result;
 		}
 
 		ReadAssemblyPtr(namecpp.c_str());
 
-		return LoadAssemblyPtr(namecpp.c_str(), this);
+		return LoadAssemblyPtr(namecpp.c_str(), this).result;
 	}
 
 	Assembly* ULRAPIImpl::LoadJITAssembly(std::string jitasm_path) // todo: load jit deps

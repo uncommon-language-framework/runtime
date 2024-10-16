@@ -18,14 +18,13 @@ namespace ULR::Loader
 
 	std::vector<GenericPlaceholder*> alloced_generic_placeholders;
 
-	HMODULE ReadNativeAssembly(const char* dll)
+	ULRResult<HMODULE> ReadNativeAssembly(const char* dll)
 	{
 		HMODULE mod = LoadLibraryA(dll);
 
 		if (mod == nullptr)
 		{
-			std::cerr << "fatal: '" << dll << "' not found" << std::endl;
-			exit(1);
+			return { nullptr, AssemblyNotFound };
 		}
 
 		char* meta = (char*) GetProcAddress(mod, "ulrmeta");
@@ -34,8 +33,8 @@ namespace ULR::Loader
 
 		if (meta == nullptr || addr == nullptr || deps == nullptr)
 		{
-			std::cerr << "fatal: '"  << dll << "' is not a valid ULR Assembly";
-			exit(1);
+			FreeLibrary(mod);
+			return { nullptr, InvalidAssembly };
 		}
 
 		size_t metalen = strlen(meta);
@@ -76,8 +75,9 @@ namespace ULR::Loader
 			}
 			else
 			{
-				std::cerr << "Invalid dependency assembly ident: " << std::string_view(deps[deps_i], DEPS_ASSEMBLY_IDENT_LEN) << std::endl;
-				exit(1);
+				delete assembly;
+
+				return { nullptr, UnknownDependencyType };
 			}
 
 			deps_i++;
@@ -189,18 +189,18 @@ namespace ULR::Loader
 
 		ReadAssemblies[asm_basename] = assembly;
 
-		return mod;
+		return { mod, None };
 	}
 
-	Assembly* LoadNativeAssembly(const char* dll, Resolver::ULRAPIImpl* api)
+	ULRResult<Assembly*> LoadNativeAssembly(const char* dll, Resolver::ULRAPIImpl* api)
 	{
 		std::string as_str = dll;
 		std::string shortname_str = as_str.substr(as_str.find_last_of("/\\") + 1);
 
 		char* shortname = const_cast<char*>(shortname_str.c_str());
 
-		if (LoadedAssemblies.count(shortname) == 1) return LoadedAssemblies[shortname];
-		if (ReadAssemblies.count(shortname) == 0) throw std::runtime_error(std::string("Attempted to load assembly '")+dll+std::string("' without reading it first"));
+		if (LoadedAssemblies.count(shortname) == 1) return { LoadedAssemblies[shortname], None };
+		if (ReadAssemblies.count(shortname) == 0) return { nullptr, AssemblyNotRead };;
 
 		Assembly* assembly = ReadAssemblies[shortname];
 
@@ -277,9 +277,15 @@ namespace ULR::Loader
 			Type* base_type = nullptr;
 
 			if (base_len != 0)
-				base_type = GetType(
+			{
+				auto res = GetType(
 					std::string_view(&meta[i-base_len], base_len)
 				);
+
+				if (res.error) return { nullptr, res.error };
+
+				base_type = res.result;
+			}
 
 			i++;
 
@@ -450,8 +456,12 @@ namespace ULR::Loader
 
 						i++; // skip `;`
 
-						if (is_generic) type->AddStaticMember(new MethodInfo(strdup(func_name.c_str()), true, argsig, GetType(full_rettype), 0, attrs, true, (char*) addr[nummember]));
-						else type->AddStaticMember(new MethodInfo(strdup(func_name.c_str()), true, argsig, GetType(full_rettype), addr[nummember], attrs, false));
+						auto rettype_resolved = GetType(full_rettype);
+
+						if (rettype_resolved.error) return { nullptr, rettype_resolved.error };
+
+						if (is_generic) type->AddStaticMember(new MethodInfo(strdup(func_name.c_str()), true, argsig, rettype_resolved.result, 0, attrs, true, (char*) addr[nummember]));
+						else type->AddStaticMember(new MethodInfo(strdup(func_name.c_str()), true, argsig, rettype_resolved.result, addr[nummember], attrs, false));
 
 						assembly->entry = (int (*)(char*)) addr[nummember];
 						
@@ -521,15 +531,19 @@ namespace ULR::Loader
 
 						i++; // skip semicolon
 
+						auto valtype_resolved = GetType(full_type);
+
+						if (valtype_resolved.error) return { nullptr, valtype_resolved.error };
+
 						if (attrs & Modifiers::Static)
 						{
-							if (is_generic) type->AddStaticMember(new FieldInfo(strdup(fldname.c_str()), true, 0, GetType(full_type), attrs, true));
-							else type->AddStaticMember(new FieldInfo(strdup(fldname.c_str()), true, addr[nummember], GetType(full_type), attrs, false));
+							if (is_generic) type->AddStaticMember(new FieldInfo(strdup(fldname.c_str()), true, 0, valtype_resolved.result, attrs, true));
+							else type->AddStaticMember(new FieldInfo(strdup(fldname.c_str()), true, addr[nummember], valtype_resolved.result, attrs, false));
 						}
 						else
 						{
-							if (is_generic) type->AddInstanceMember(new FieldInfo(strdup(fldname.c_str()), false, 0, GetType(full_type), attrs, true));
-							else type->AddInstanceMember(new FieldInfo(strdup(fldname.c_str()), false, addr[nummember], GetType(full_type), attrs, false));
+							if (is_generic) type->AddInstanceMember(new FieldInfo(strdup(fldname.c_str()), false, 0, valtype_resolved.result, attrs, true));
+							else type->AddInstanceMember(new FieldInfo(strdup(fldname.c_str()), false, addr[nummember], valtype_resolved.result, attrs, false));
 						}
 
 						continue;
@@ -613,7 +627,15 @@ namespace ULR::Loader
 						MethodInfo* getter = nullptr;
 						MethodInfo* setter = nullptr;
 
-						Type* proptype = GetType(full_type);
+						auto res = GetType(full_type);
+
+						if (res.error) return { nullptr, res.error };
+
+						Type* proptype = res.result;
+
+						auto voidtype_resolved = GetType("[System]Void");
+						
+						if (voidtype_resolved.error) return { nullptr, voidtype_resolved.error };
 
 						if (has_getter)
 						{
@@ -636,7 +658,7 @@ namespace ULR::Loader
 									strdup((std::string("set_")+propname).c_str()),
 									attrs & Modifiers::Static,
 									{ proptype },
-									GetType("[System]Void"),
+									voidtype_resolved.result,
 									addr[nummember],
 									attrs,
 									is_generic,
@@ -650,7 +672,7 @@ namespace ULR::Loader
 								strdup((std::string("set_")+propname).c_str()),
 								attrs & Modifiers::Static,
 								{ proptype },
-								GetType("[System]Void"),
+								voidtype_resolved.result,
 								addr[nummember],
 								attrs,
 								is_generic,
@@ -731,15 +753,19 @@ namespace ULR::Loader
 
 				i++; // skip `;`
 
+				auto rettype_resolved = GetType(full_rettype);
+
+				if (rettype_resolved.error) return { nullptr, rettype_resolved.error };
+
 				if (attrs & Modifiers::Static)
 				{
-					if (is_generic) type->AddStaticMember(new MethodInfo(strdup(func_name.c_str()), true, argsig, GetType(full_rettype), 0, attrs, true, (char*) addr[nummember]));
-					else type->AddStaticMember(new MethodInfo(strdup(func_name.c_str()), true, argsig, GetType(full_rettype), addr[nummember], attrs, false));
+					if (is_generic) type->AddStaticMember(new MethodInfo(strdup(func_name.c_str()), true, argsig, rettype_resolved.result, 0, attrs, true, (char*) addr[nummember]));
+					else type->AddStaticMember(new MethodInfo(strdup(func_name.c_str()), true, argsig, rettype_resolved.result, addr[nummember], attrs, false));
 				}
 				else
 				{
-					if (is_generic) type->AddInstanceMember(new MethodInfo(strdup(func_name.c_str()), false, argsig, GetType(full_rettype), 0, attrs, true, (char*) addr[nummember]));
-					else type->AddInstanceMember(new MethodInfo(strdup(func_name.c_str()), true, argsig, GetType(full_rettype), addr[nummember], attrs, false));
+					if (is_generic) type->AddInstanceMember(new MethodInfo(strdup(func_name.c_str()), false, argsig, rettype_resolved.result, 0, attrs, true, (char*) addr[nummember]));
+					else type->AddInstanceMember(new MethodInfo(strdup(func_name.c_str()), true, argsig, rettype_resolved.result, addr[nummember], attrs, false));
 				}
 			}
 
@@ -761,7 +787,7 @@ namespace ULR::Loader
 
 		init_asm(api);
 
-		return assembly;
+		return { assembly, None };
 	}
 
 	std::vector<Type*> ParseArgs(size_t* i, char* meta)
@@ -788,7 +814,7 @@ namespace ULR::Loader
 		return argtypes;
 	}
 
-	Type* GetType(std::string_view qual_name)
+	ULRResult<Type*> GetType(std::string_view qual_name)
 	{
 		if (qual_name[0] == 'T')
 		{
@@ -796,21 +822,21 @@ namespace ULR::Loader
 			
 			for (auto& placeholder : alloced_generic_placeholders)
 			{
-				if (placeholder->num == generic_num) return placeholder;
+				if (placeholder->num == generic_num) return { placeholder, None };
 			}
 
 			GenericPlaceholder* placeholder = new GenericPlaceholder(generic_num);
 
 			alloced_generic_placeholders.emplace_back(placeholder);
 
-			return placeholder;
+			return { placeholder, None };
 		}
 
 		for (const auto& entry: ReadAssemblies)
 		{
 			Assembly* assembly = entry.second;
 
-			if (assembly->types.count(qual_name) == 1) return assembly->types[qual_name];
+			if (assembly->types.count(qual_name) == 1) return { assembly->types[qual_name], None };
 		}
 
 
@@ -821,18 +847,27 @@ namespace ULR::Loader
 		{			
 			Assembly* ArrayTypeAssembly = LoadedAssemblies["ULR.<ArrayTypes>"];
 			
-			Type* elem_type = GetType(std::string_view(qual_name.data(), len-2)); // get inner element type (if it is a nested array, recursion will provide us the proper type)
+			auto res = GetType(std::string_view(qual_name.data(), len-2));
 
-			Type* array_type = new Type(TypeType::ArrayType, ArrayTypeAssembly, strdup(const_cast<const char*>(std::string(qual_name).c_str())), Modifiers::Public | Modifiers::Sealed, 0, { }, GetType("[System]Object"), elem_type);
+			if (res.error) return { nullptr, res.error };
+
+			Type* elem_type = res.result; // get inner element type (if it is a nested array, recursion will provide us the proper type)
+
+
+			auto objecttype_resolved = GetType("[System]Object");
+
+			if (objecttype_resolved.error) return { nullptr, objecttype_resolved.error };
+
+			Type* array_type = new Type(TypeType::ArrayType, ArrayTypeAssembly, strdup(const_cast<const char*>(std::string(qual_name).c_str())), Modifiers::Public | Modifiers::Sealed, 0, { }, objecttype_resolved.result, elem_type);
 
 			PopulateVtable(array_type);
 
 			ArrayTypeAssembly->types[array_type->name] = array_type; // use array_type->name because it is guaranteed to be dynamically allocated and last as long as array_type lasts
 
-			return array_type;
+			return { array_type, None };
 		}
 
-		throw std::runtime_error("Type not found");
+		return { nullptr, TypeNotFound };
 	}
 
 	// TODO: make this work for props (prob just add the prop MethodInfos to type attrs during loading)

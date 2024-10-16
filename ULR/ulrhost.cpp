@@ -18,7 +18,7 @@ using namespace ULR::Resolver;
 char* (*special_string_MAKE_FROM_LITERAL)(char* str, int len);
 char* (*special_array_from_ptr)(void* ptr, int size, Type* type);
 
-char* generate_ulr_argv(int argc, char* argv[])
+ULRResult<char*> generate_ulr_argv(int argc, char* argv[])
 {
 	char** ulr_args = new char*[argc-1]; // argc-1 to skip ulrhost.exe arg
 
@@ -27,13 +27,17 @@ char* generate_ulr_argv(int argc, char* argv[])
 		ulr_args[i] = special_string_MAKE_FROM_LITERAL(argv[i+1], strlen(argv[i+1]));
 	}
 
-	Type* StringArrayType = Loader::GetType("[System]String[]");
+	auto res = Loader::GetType("[System]String[]");
+
+	if (res.error) return { nullptr, res.error };
+
+	Type* StringArrayType = res.result;
 
 	char* arr = special_array_from_ptr(ulr_args, argc-1, StringArrayType);
 
 	delete[] ulr_args;
 
-	return arr;
+	return { arr, None };
 }
 
 void handle_access_violation(int signo)
@@ -43,7 +47,13 @@ void handle_access_violation(int signo)
 		<< internal_api->GetStackTrace(2);
 }
 
-extern "C" int HostNativeAssembly(
+struct HostingResult // this implementation is not exposed to the caller of HostXXXXAssembly(), so no fields are public 
+{
+	int retcode;
+	ULRInternalError error;
+};
+
+extern "C" HostingResult HostNativeAssembly(
 	char* assembly_name,
 	char* debugger_path,
 	char* stdlib_path,
@@ -57,9 +67,10 @@ extern "C" int HostNativeAssembly(
 
 	if (!debugger)
 	{
-		std::cerr << "ULR Debugger not found.\n";
-		return 1;
+		return { 0, DebuggerNotFound };
 	}
+
+	bool debugger_successfully_loaded;
 
 	ULRAPIImpl lclapi = ULRAPIImpl( // perhaps refactor Loader into an object someday
 		&Loader::LoadedAssemblies,
@@ -67,8 +78,12 @@ extern "C" int HostNativeAssembly(
 		Loader::ReadNativeAssembly,
 		Loader::LoadNativeAssembly,
 		Loader::PopulateVtable,
-		debugger
+		debugger,
+		debugger_successfully_loaded
 	);
+
+	if (!debugger_successfully_loaded) return { 0, InvalidDebugger };
+
 	/* Initialize Internal Library */
 
 	internal_api = &lclapi;
@@ -80,17 +95,26 @@ extern "C" int HostNativeAssembly(
 	/* Load Stdlib*/
 	
 	Loader::ReadNativeAssembly(stdlib_path);
-	Assembly* stdlibasm = Loader::LoadNativeAssembly(stdlib_path, &lclapi);
+
+	auto res = Loader::LoadNativeAssembly(stdlib_path, &lclapi);
+
+	if (res.error) return { 0, res.error }; // TODO: this and below may actually cause leaks, have a ULRCleanup function which is called before returning (could be done by wrapper function)
+
+	Assembly* stdlibasm = res.result;
 
 	/* Load Main Assembly */
 
 	Loader::ReadNativeAssembly(assembly_name);
 
-	Assembly* mainasm = Loader::LoadNativeAssembly(assembly_name, &lclapi);
+	res = Loader::LoadNativeAssembly(assembly_name, &lclapi);
+
+	if (res.error) return { 0, res.error };
+
+	Assembly* mainasm = res.result;
 
 	if (mainasm->entry == nullptr)
 	{
-		throw std::runtime_error("No entry point found.");
+		return { 0, EntryPointNotFound };
 	}
 
 	/* Initialize string[] args / argv */
@@ -98,48 +122,18 @@ extern "C" int HostNativeAssembly(
 	special_string_MAKE_FROM_LITERAL = (char* (*)(char*, int)) lclapi.LocateSymbol(stdlibasm, "special_string_MAKE_FROM_LITERAL");
 	special_array_from_ptr = (char* (*)(void*, int, Type*)) lclapi.LocateSymbol(stdlibasm, "special_array_from_ptr");
 	
-	char* ulr_args_arr_obj = generate_ulr_argv(argc_full, argv_full);
+	auto args_res = generate_ulr_argv(argc_full, argv_full);
+
+	if (args_res.error) return { 0, args_res.error };
+
+	char* ulr_args_arr_obj = args_res.result;
 
 	int retcode;
 	
-	try
-	{
-		lclapi.InitGCLocalVarRoot((char**) &retcode);
+	lclapi.InitGCLocalVarRoot((char**) &retcode);
 
-		retcode = mainasm->entry(ulr_args_arr_obj);
-	}
-	catch (char* exc)
-	{
-		Type* SystemException = lclapi.GetTypeOf(exc); // OR GetType("[System]Exception", "System.Runtime.Native.dll")
+	retcode = mainasm->entry(ulr_args_arr_obj);
 
-		PropertyInfo* StackTraceProperty = lclapi.GetProperty(SystemException, "StackTrace", BindingFlags::Instance | BindingFlags::Public);
-		PropertyInfo* MessageProperty = lclapi.GetProperty(SystemException, "Message", BindingFlags::Instance | BindingFlags::Public);
-
-		// These are both System_Strings
-		void* stacktrace = StackTraceProperty->GetValue(exc);
-		void* message = MessageProperty->GetValue(exc);
-
-		// extract char* from strings
-
-		int stacktrace_len = *((int*) (((char*) stacktrace)+sizeof(Type*)));
-		int message_len = *((int*) (((char*) message)+sizeof(Type*)));
-
-		char* stacktrace_cstr = (char*) (((char*) stacktrace)+sizeof(Type*)+sizeof(int));
-		char* message_cstr = (char*) (((char*) message)+sizeof(Type*)+sizeof(int));
-
-		std::string_view stacktrace_cppstr(stacktrace_cstr, stacktrace_len);
-		std::string_view message_cppstr(message_cstr, message_len);
-
-		std::cerr
-			<< "Unhandled Exception "
-			<< lclapi.GetDisplayNameOf(SystemException)
-			<< ": "
-			<< message_cppstr
-			<< stacktrace_cppstr
-			<< std::endl;
-		
-		retcode = 1;
-	}
 	
 	// Final deallocation and cleanup (of ULR objects and the allocated assemblies)
 
@@ -173,5 +167,5 @@ extern "C" int HostNativeAssembly(
 	FreeLibrary(debugger);
 	SymCleanup(GetCurrentProcess());
 
-	return retcode;
+	return { retcode, None };
 }

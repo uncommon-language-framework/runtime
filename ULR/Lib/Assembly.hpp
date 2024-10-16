@@ -21,6 +21,26 @@
 
 namespace ULR
 {
+	enum ULRInternalError : int
+	{
+		None,
+		DebuggerNotFound,
+		InvalidDebugger,
+		AssemblyNotFound,
+		AssemblyNotRead,
+		InvalidAssembly,
+		UnknownDependencyType,
+		TypeNotFound,
+		EntryPointNotFound,
+	};
+
+	template <typename T> struct ULRResult
+	{
+		public:
+			T result;
+			ULRInternalError error;
+	};
+
 	enum TypeType : byte // also used with IL
 	{
 		Class,

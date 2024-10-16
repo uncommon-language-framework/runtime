@@ -40,8 +40,8 @@ namespace ULR::Resolver
 
 	class ULRAPIImpl
 	{
-		Assembly* (*LoadAssemblyPtr)(const char name[], ULRAPIImpl* api);
-		HMODULE (*ReadAssemblyPtr)(const char name[]);
+		ULRResult<Assembly*> (*LoadAssemblyPtr)(const char name[], ULRAPIImpl* api);
+		ULRResult<HMODULE> (*ReadAssemblyPtr)(const char name[]);
 		void (*StaticDebug)(StaticDebugInfo& info);
 
 		size_t prev_size_accessible = 0;
@@ -64,10 +64,11 @@ namespace ULR::Resolver
 			ULRAPIImpl(
 				std::map<std::string_view, Assembly*>* assemblies,
 				std::map<std::string_view, Assembly*>* read_assemblies,
-				HMODULE (*ReadAssembly)(const char name[]),
-				Assembly* (*LoadAssembly)(const char name[], ULRAPIImpl* api),
+				ULRResult<HMODULE> (*ReadAssembly)(const char name[]),
+				ULRResult<Assembly*> (*LoadAssembly)(const char name[], ULRAPIImpl* api),
 				void (*PopulateVtable)(Type* type),
-				HMODULE debugger
+				HMODULE debugger,
+				bool& debugger_load_successful
 			);
 
 			bool EnsureLoaded(std::string_view assembly_name);
