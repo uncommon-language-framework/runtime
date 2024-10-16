@@ -2,11 +2,21 @@ using System.Runtime.InteropServices;
 
 namespace ULR;
 
+[StructLayout(LayoutKind.Sequential)]
+readonly struct HostingResult
+{
+	public readonly int RetCode;
+	public readonly int Error;
+};
+
+public class ULRInternalException(int code)
+	: Exception($"ULR Internal Error (code {code})");
+
 static partial class ULRHost
 {
 	[LibraryImport($"ULR.Hosting.dll", StringMarshalling = StringMarshalling.Custom, StringMarshallingCustomType = typeof(System.Runtime.InteropServices.Marshalling.AnsiStringMarshaller))]
 	[UnmanagedCallConv(CallConvs = new Type[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
-	private static partial int HostNativeAssembly(
+	private static partial HostingResult HostNativeAssembly(
 		string assemblyName,
 		string debuggerPath,
 		string stdlibPath,
@@ -23,6 +33,10 @@ static partial class ULRHost
 	{
 		string[] argv = [assemblyName, ..args];
 		
-		return HostNativeAssembly(assemblyName, debuggerPath, stdlibPath, argv.Length, argv);
+		var res = HostNativeAssembly(assemblyName, debuggerPath, stdlibPath, argv.Length, argv);
+	
+		if (res.Error != 0) throw new ULRInternalException(res.Error);
+
+		return res.RetCode;
 	}
 }

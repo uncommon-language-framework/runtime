@@ -303,8 +303,12 @@ namespace ULR::Loader
 
 				if (intfc_len != 0)
 				{
+					auto res = GetType(std::string_view(&meta[i-intfc_len], intfc_len));
+
+					if (res.error) return { nullptr, res.error };
+
 					interfaces.emplace_back(
-						GetType(std::string_view(&meta[i-intfc_len], intfc_len))
+						res.result
 					);
 				}
 				
@@ -369,7 +373,11 @@ namespace ULR::Loader
 
 						i++; // skip open paren
 
-						std::vector<Type*> args = ParseArgs(&i, meta);
+						auto res = ParseArgs(&i, meta);
+
+						if (res.error) return { nullptr, res.error };
+
+						std::vector<Type*> args = res.result;
 
 						i++; // skip `;`
 
@@ -452,7 +460,11 @@ namespace ULR::Loader
 						
 						i++; // skip open paren
 
-						std::vector<Type*> argsig = ParseArgs(&i, meta);
+						auto res = ParseArgs(&i, meta);
+
+						if (res.error) return { nullptr, res.error };
+
+						std::vector<Type*> argsig = res.result;
 
 						i++; // skip `;`
 
@@ -749,7 +761,11 @@ namespace ULR::Loader
 				
 				i++; // skip open paren
 
-				std::vector<Type*> argsig = ParseArgs(&i, meta);
+				auto res = ParseArgs(&i, meta);
+
+				if (res.error) return { nullptr, res.error };
+
+				std::vector<Type*> argsig = res.result;
 
 				i++; // skip `;`
 
@@ -790,7 +806,7 @@ namespace ULR::Loader
 		return { assembly, None };
 	}
 
-	std::vector<Type*> ParseArgs(size_t* i, char* meta)
+	ULRResult<std::vector<Type*>> ParseArgs(size_t* i, char* meta)
 	{
 		std::vector<Type*> argtypes;
 
@@ -803,7 +819,11 @@ namespace ULR::Loader
 				(*i)++;
 			}
 
-			argtypes.emplace_back(GetType(std::string_view(&meta[start], (*i)-start)));
+			auto res = GetType(std::string_view(&meta[start], (*i)-start));
+
+			if (res.error) return { (std::vector<Type*>) 0, res.error };
+
+			argtypes.emplace_back(res.result);
 
 			if (meta[*i] == ',') (*i)++;
 
@@ -811,7 +831,7 @@ namespace ULR::Loader
 
 		(*i)++;
 
-		return argtypes;
+		return { argtypes, None };
 	}
 
 	ULRResult<Type*> GetType(std::string_view qual_name)

@@ -21,6 +21,6 @@ namespace ULR::Loader
 	ULRResult<HMODULE> ReadNativeAssembly(const char* dll);
 	ULRResult<Assembly*> LoadNativeAssembly(const char* dll, Resolver::ULRAPIImpl* api);
 	ULRResult<Type*> GetType(std::string_view qual_name);
-	std::vector<Type*> ParseArgs(size_t* i, char* meta);
+	ULRResult<std::vector<Type*>> ParseArgs(size_t* i, char* meta);
 	void PopulateVtable(Type* type);
 }
