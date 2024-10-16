@@ -68,7 +68,7 @@ namespace ULR::Resolver
 		return true;
 	}
 
-	Assembly* ULRAPIImpl::LoadAssembly(std::string_view assembly_name)
+	Assembly* ULRAPIImpl::LoadNativeAssembly(std::string_view assembly_name)
 	{
 		std::string namecpp(assembly_name);
 

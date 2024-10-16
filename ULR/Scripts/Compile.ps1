@@ -44,13 +44,11 @@ function IsCachedOrStoreIfNot($file)
 }
 
 $libfiles = [System.Collections.Generic.List[string]]::new()
-$llvmlibs = (llvm-config --libs).Split()
-$llvmlibsdir = "-L$(llvm-config --libdir)"
 $winlibs = "-lole32", "-luuid", "-ldbghelp"
 
 foreach ($item in Get-ChildItem ./Lib -File -Recurse)
 {
-	if ($item.FullName.Contains("Loader\")) { continue; }
+	if ($item.FullName.Contains("Loader")) { continue; }
 
 	if ($item.FullName.EndsWith(".cpp") -and ((IsCachedOrStoreIfNot($item.FullName)) -eq 0)) { $libfiles.Add($item.FullName) }
 }
@@ -70,13 +68,13 @@ if ($args[2] -ne "nolib")
 	{
 		Move-Item *.o ObjCache/LibDbgObj -Force
 	
-		g++64 -shared -o "ULR.NativeLib.dll" ObjCache/LibDbgObj/*.o $llvmlibsdir $llvmlibs $winlibs
+		g++64 -shared -o "ULR.NativeLib.dll" ObjCache/LibDbgObj/*.o $winlibs
 	}
 	else
 	{
 		Move-Item *.o ObjCache/LibObj -Force
 	
-		g++64 -shared -o "ULR.NativeLib.dll" ObjCache/LibObj/*.o $llvmlibsdir $llvmlibs $winlibs
+		g++64 -shared -o "ULR.NativeLib.dll" ObjCache/LibObj/*.o $winlibs
 	}
 }
 
@@ -94,7 +92,7 @@ if  ($args[2] -ne "libonly")
 		
 		Move-Item *.o ObjCache/DbgObj -Force
 
-		g++64 "ObjCache/DbgObj/ulrhost.o" "ULR.NativeLib.dll" "ObjCache/DbgObj/Loader.o" -o ulrhost.exe -masm=intel -Wno-write-strings -std=c++17 -ldbghelp
+		g++64 "ObjCache/DbgObj/ulrhost.o" "ULR.NativeLib.dll" "ObjCache/DbgObj/Loader.o" -o "ULR.Hosting.dll" -shared -masm=intel -Wno-write-strings -std=c++17 -ldbghelp
 	}
 	else
 	{
@@ -103,7 +101,7 @@ if  ($args[2] -ne "libonly")
 
 		Move-Item *.o ObjCache/Obj -Force
 
-		g++64 "ObjCache/Obj/ulrhost.o" "ULR.NativeLib.dll" "ObjCache/Obj/Loader.o" -o ulrhost.exe -masm=intel -Wno-write-strings -std=c++17 -ldbghelp
+		g++64 "ObjCache/Obj/ulrhost.o" "ULR.NativeLib.dll" "ObjCache/Obj/Loader.o" -o "ULR.Hosting.dll" -shared -masm=intel -Wno-write-strings -std=c++17 -ldbghelp
 	}
 }
 

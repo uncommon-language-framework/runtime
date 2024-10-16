@@ -43,23 +43,29 @@ void handle_access_violation(int signo)
 		<< internal_api->GetStackTrace(2);
 }
 
-int main(int argc, char* argv[])
+extern "C" int HostNativeAssembly(
+	char* assembly_name,
+	char* debugger_path,
+	char* stdlib_path,
+	int argc_full,
+	char** argv_full
+)
 {
 	std::signal(SIGSEGV, handle_access_violation);
 
-	HMODULE debugger = LoadLibraryA("../../uld/src/uld/uld.dll"); // TODO: grab from cli args
+	HMODULE debugger = LoadLibraryA(debugger_path); // TODO: grab from cli args
 
 	if (!debugger)
 	{
-		std::cerr << "Default Debugger not found.\n";
+		std::cerr << "ULR Debugger not found.\n";
 		return 1;
 	}
 
 	ULRAPIImpl lclapi = ULRAPIImpl( // perhaps refactor Loader into an object someday
 		&Loader::LoadedAssemblies,
 		&Loader::ReadAssemblies,
-		Loader::ReadAssembly,
-		Loader::LoadAssembly,
+		Loader::ReadNativeAssembly,
+		Loader::LoadNativeAssembly,
 		Loader::PopulateVtable,
 		debugger
 	);
@@ -73,18 +79,14 @@ int main(int argc, char* argv[])
 	
 	/* Load Stdlib*/
 	
-	char* stdlib_path = "../../ulflib/src/native/System.Runtime.Native.dll";
-
-	Loader::ReadAssembly(stdlib_path);
-	Assembly* stdlibasm = Loader::LoadAssembly(stdlib_path, &lclapi);
+	Loader::ReadNativeAssembly(stdlib_path);
+	Assembly* stdlibasm = Loader::LoadNativeAssembly(stdlib_path, &lclapi);
 
 	/* Load Main Assembly */
 
-	char* assembly_name = argv[1];
+	Loader::ReadNativeAssembly(assembly_name);
 
-	Loader::ReadAssembly(assembly_name);
-
-	Assembly* mainasm = Loader::LoadAssembly(assembly_name, &lclapi);
+	Assembly* mainasm = Loader::LoadNativeAssembly(assembly_name, &lclapi);
 
 	if (mainasm->entry == nullptr)
 	{
@@ -96,7 +98,7 @@ int main(int argc, char* argv[])
 	special_string_MAKE_FROM_LITERAL = (char* (*)(char*, int)) lclapi.LocateSymbol(stdlibasm, "special_string_MAKE_FROM_LITERAL");
 	special_array_from_ptr = (char* (*)(void*, int, Type*)) lclapi.LocateSymbol(stdlibasm, "special_array_from_ptr");
 	
-	char* ulr_args_arr_obj = generate_ulr_argv(argc, argv);
+	char* ulr_args_arr_obj = generate_ulr_argv(argc_full, argv_full);
 
 	int retcode;
 	

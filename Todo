@@ -34,4 +34,6 @@
 
 - IMPORTANT: exception throwing needs to be handled differently that C++ throwing
 	- Or better yet... don't add exceptions at all!
-	- Just have an error class in the stdlib with a bunch of error constants
+		- Just have an error class in the stdlib with a bunch of error constants
+
+- Debugger and stdlib paths: "../../uld/src/uld/uld.dll"; "../../ulflib/src/native/System.Runtime.Native.dll";

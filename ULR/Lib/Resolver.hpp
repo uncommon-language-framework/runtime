@@ -71,7 +71,7 @@ namespace ULR::Resolver
 			);
 
 			bool EnsureLoaded(std::string_view assembly_name);
-			Assembly* LoadAssembly(std::string_view assembly_name);
+			Assembly* LoadNativeAssembly(std::string_view assembly_name);
 			Assembly* LoadJITAssembly(std::string jitasm_path);
 			Assembly* LocateAssembly(std::string_view assembly_name);
 			void* LocateSymbol(Assembly* assembly, char symbol_name[]);

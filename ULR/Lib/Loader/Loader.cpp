@@ -18,7 +18,7 @@ namespace ULR::Loader
 
 	std::vector<GenericPlaceholder*> alloced_generic_placeholders;
 
-	HMODULE ReadAssembly(const char* dll)
+	HMODULE ReadNativeAssembly(const char* dll)
 	{
 		HMODULE mod = LoadLibraryA(dll);
 
@@ -60,10 +60,25 @@ namespace ULR::Loader
 
 		while (deps[deps_i] != nullptr) // load deps
 		{
-			// don't double-load
-			if (LoadedAssemblies.count(deps[deps_i]) || ReadAssemblies.count(deps[deps_i])) continue;
+			char* assembly_path = deps[deps_i]+DEPS_ASSEMBLY_IDENT_LEN;
 
-			ReadAssembly(deps[deps_i]);
+			if (strncmp(deps[deps_i], NATIVE_ASSEMBLY_IDENT, DEPS_ASSEMBLY_IDENT_LEN) == 0)
+			{
+				if (LoadedAssemblies.count(assembly_path) || ReadAssemblies.count(assembly_path)) continue;
+
+				ReadNativeAssembly(assembly_path);
+			}
+			else if (strncmp(deps[deps_i], JIT_ASSEMBLY_IDENT, DEPS_ASSEMBLY_IDENT_LEN) == 0)
+			{
+				if (LoadedAssemblies.count(assembly_path) || ReadAssemblies.count(assembly_path)) continue;
+
+				internal_api->LoadJITAssembly(assembly_path); // TODO: only read JIT assembly once this functionality is available (first-pass JIT), then replace this with a call to the read functionality
+			}
+			else
+			{
+				std::cerr << "Invalid dependency assembly ident: " << std::string_view(deps[deps_i], DEPS_ASSEMBLY_IDENT_LEN) << std::endl;
+				exit(1);
+			}
 
 			deps_i++;
 		}
@@ -177,7 +192,7 @@ namespace ULR::Loader
 		return mod;
 	}
 
-	Assembly* LoadAssembly(const char* dll, Resolver::ULRAPIImpl* api)
+	Assembly* LoadNativeAssembly(const char* dll, Resolver::ULRAPIImpl* api)
 	{
 		std::string as_str = dll;
 		std::string shortname_str = as_str.substr(as_str.find_last_of("/\\") + 1);
