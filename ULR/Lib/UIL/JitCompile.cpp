@@ -10,18 +10,13 @@ namespace ULR::IL
 		return StackBaseCompile(meta_asm, il, string_ref);
 	}
 
-	// NOTE-IMPORTANT-NOTE: as a soln for the 12-byte offset replace_addr problem, follow the CLR JIT pattern (dereference pretedermined addr [from JIT malloc pool] which is later filled)
 	// TODO: add support for ctors and dtors
 	// TODO: make sure JIT aligns all pointers to eight bytes OR think of a better soln
 	// TODO: add support for generic IL
 	// TODO: add support for float operations (within the switch case statements)
-	// TODO: prepare JIT for multiple scopes
 	// NOTE: consider using std::list due to all the insertions and lack of random access
-	// NOTE: this compiles for little endian, check system endianness and use correct endian -- upon further thought this may not be an issue since endianness would also apply to the assembled assembly
 	CompilationError JITContext::StackBaseCompile(Assembly* meta_asm, byte il[], byte string_ref[])
 	{
-		Helpers::EvalStack eval_stack;
-
 		size_t i = 0;
 
 		std::map<byte*, MemberInfo*> replace_addrs;

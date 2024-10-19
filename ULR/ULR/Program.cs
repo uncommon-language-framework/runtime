@@ -44,7 +44,7 @@ public class Program
 				}
 				else
 				{
-					ret = ULRHost.HostNative( // TODO: change to HostJIT
+					ret = ULRHost.HostJIT(
 						options.AssemblyName,
 						options.DebuggerPath,
 						options.StdlibPath,

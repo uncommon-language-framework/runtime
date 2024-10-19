@@ -7,7 +7,7 @@
 #error "No UIL JIT support for non-windows x64 platforms currently"
 #endif
 
-
+#define GetStorageSizex64(type) IsBoxableStruct(type) ? PadToNextWordx64(type->size) : 8
 
 namespace ULR::IL
 {
@@ -26,9 +26,14 @@ namespace ULR::IL
 				FuncRetValue,
 				LocalLookup,
 				ArrayLookup
-			};
+			} expr_type;
 
-			ExpressionType expr_type;
+			union Value {
+				void* addr;
+				int index;
+				int rbp_offset;
+				std::string_view str;
+			} value;
 		};
 
 		using EvalStack = std::stack<StackValueExpression>;
@@ -37,6 +42,7 @@ namespace ULR::IL
 		{
 			int offset;
 			size_t size;
+			bool is_struct;
 		};
 
 		using LocalLookupTable = std::vector<LocalInfo>;		
@@ -156,7 +162,27 @@ namespace ULR::IL
 		Float64
 	};
 
+	class LocalInfo
+	{
+		public:
+			int jit_index;
+			Type* lcl_type;
+			int rbp_offset;
+	};
 
+	class JITMethodInfo
+	{
+		public:
+			void* addr;
+			std::vector<LocalInfo> locals;
+	};
+
+	class AssemblyJITInfo
+	{
+		public:
+			std::vector<JITMethodInfo> methods;
+	};
+	
 	class JITContext
 	{
 		std::vector<void*> virt_alloced;

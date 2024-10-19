@@ -21,6 +21,11 @@
 
 namespace ULR
 {
+	namespace IL
+	{
+		class AssemblyJITInfo;
+	}
+
 	enum ULRInternalError : int
 	{
 		None,
@@ -242,6 +247,7 @@ namespace ULR
 			int (*entry)(char*) = nullptr; // even if Main() doesn't take args, the register will be ignored by Main() so it doesn't matter if we pass it and it doesn't accept string[] argv
 			std::map<std::string_view, Type*> types;
 			std::unordered_map<std::string_view, void*> cached_sym_lookups;
+			IL::AssemblyJITInfo* jit_info = nullptr;
 
 			Assembly(char* name, char* path, char* meta, size_t metalen, void** addr, char** deps, HMODULE handle);
 			~Assembly();

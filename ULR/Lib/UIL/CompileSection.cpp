@@ -28,6 +28,8 @@ namespace ULR::IL
 			{
 				case LocalDecl:
 					return { "Cannot declare locals inside of a section! Locals must be declared before all sections in method.", CompilationError::ErrorCode::InvalidDirective, &il[i] };
+				case FieldDecl:
+					return { "Cannot declare fields inside of a section!", CompilationError::ErrorCode::InvalidDirective, &il[i] };
 				case Add:
 					num_eval_stack_elems-=1; // net change
 					
@@ -786,23 +788,59 @@ namespace ULR::IL
 
 						Helpers::LocalInfo local = locals[loc_num];
 
-						if (local.size <= 8)
+						if (local.size == 8) // reference types and 8-byte struct types (full value loaded)
 						{
 							/*
 								push [rbp+offset]
 							*/
-							code.insert(code.end(), { 0xFF, 0x35 });
+							code.insert(code.end(), { 0xFF, 0xB5 });
 							code.insert(code.end(), (byte*) &local.offset, ((byte*) &local.offset)+sizeof(uint32_t));
 						}
-						else
+						else // valuetypes where size != 8
 						{
-							/*
-								lea rax, [rbp+offset]
-								push rax
-							*/
-							code.insert(code.end(), { 0x48, 0x8D, 0x85 });
-							code.insert(code.end(), (byte*) &local.offset, ((byte*) &local.offset)+sizeof(uint32_t));
-							code.push_back(0x50);
+							switch (local.size)
+							{
+								case 1:
+									/*
+										sub rsp, 8
+										movzx rax, byte ptr [rbp+offset]
+										mov [rsp], rax
+									*/
+									code.insert(code.end(), { 0x48, 0x83, 0xEC, 0x08, 0x48, 0x0F, 0xB6, 0x85 });
+									code.insert(code.end(), (byte*) &local.offset, ((byte*) &local.offset)+sizeof(uint32_t));
+									code.insert(code.end(), { 0x48, 0x89, 0x04, 0x24 });
+									break;
+								case 2:
+									/*
+										sub rsp, 8
+										movzx rax, word ptr [rbp+offset]
+										mov [rsp], rax
+									*/
+									code.insert(code.end(), { 0x48, 0x83, 0xEC, 0x08, 0x48, 0x0F, 0xB7, 0x85 });
+									code.insert(code.end(), (byte*) &local.offset, ((byte*) &local.offset)+sizeof(uint32_t));
+									code.insert(code.end(), { 0x48, 0x89, 0x04, 0x24 });									
+									break;
+								case 4:
+									/*
+										sub rsp, 8
+										mov eax, [rbp+offset]
+										mov [rsp], rax
+									*/
+									code.insert(code.end(), { 0x48, 0x83, 0xEC, 0x08, 0x8B, 0x85 });
+									code.insert(code.end(), (byte*) &local.offset, ((byte*) &local.offset)+sizeof(uint32_t));
+									code.insert(code.end(), { 0x48, 0x89, 0x04, 0x24 });
+									break;
+								default: // larger than 8 byte valuetypes
+									/*
+										lea rax, [rbp+offset]
+										push rax
+									*/
+									code.insert(code.end(), { 0x48, 0x8D, 0x85 });
+									code.insert(code.end(), (byte*) &local.offset, ((byte*) &local.offset)+sizeof(uint32_t));
+									code.push_back(0x50);
+
+									break;
+							}
 						}
 					}
 					break;

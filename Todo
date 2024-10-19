@@ -1,15 +1,10 @@
 - add arg passing in MethodInvoke where the first four args are also placed on the stack (find if this is required first)
 - add methodinvoke for non win64 systems
-- change some reinterpret casts in stdlib to normal casts
-- add runtime member reordering for runtime inheritance once dynamic type generation is allowed (field reordering)
+- add runtime member reordering for runtime inheritance once dynamic type generation is allowed (field reordering) - will not add since types should not have child types which have members of the same name
 - dynamic generic type generation
-	- generic-in-generic type generation/support
-		- for this, have the compiler create a list of static generic-in-generics before LLIR in generic IR string
-			- have each nested generic assigned a type ident (which the compiler should have already used in its LLIR) and any appearances of `sizeof_TypeIdent` should be replaced with the size of the nested generic by the runtime
-- prebuilt generic type loading
-- array type deps loading from metadata - WILL NOT IMPL - array types can be created from InitAssembly
+	- see JIT todo
 - have loader support all valid modifiers for different attributes
-- add static ctor support - WILL NOT IMPL - decided that compilers should manage static ctors themselves
+- add static ctor support - this will either be done later or never
 - remove switch case blocks in Loader that are always true or false
 - Check MethodInfo::Invoke() on a method with more than 4 args
 	- If stack space needs to be alloced for the call, execute `sub rsp, 32+((nargs-4)*8)`
@@ -19,15 +14,16 @@
 	- Update ConstructorInfo::Invoke() accordingly
 - Finish JIT
 	- Fix GC to work with JIT assemblies (can you CONTEXT to get register values to also log as locals (or have JIT assemblies create a list of registers that are used for locals to log less))
-	- Add call capabilites to JIT
-	- Have ULD support reading JIT allocations & JIT interactions
+	- Have ULR.Debugging.dll support reading JIT allocations & JIT interactions
 	- Add jmp instrs
 	- Attach vtable calls to method names somehow for jit compilation (e.g. create a mapping between name and number)
+	- fix vtables somehow...
 - TODO: pad all valuetypes to 8 bytes upon loading
 - TODO: have JIT auto-create `this` as first arg for instance methods
 - TODO: have JIT cache the postfill buffers so redundant ones are not allocated
 	- Have JIT only use postfill when the address isn't available
 	- Another memory opt -- since we have to allocate full pages anyway, maybe try to fit multiple functions on one page
+	- use std::list to reduce number of large reallocations before full function page is allocated
 - NOTE: MethodInfo::Invoke and JIT are not compatible with return values case 2 [here](https://learn.microsoft.com/en-us/cpp/build/x64-calling-convention?view=msvc-170#example-of-return-value-2---128-bit-result) (probably won't fix)
 - Have support for executing with a JIT-only assembly (e.g. UIL binary)
 	- TODO: have JIT only asms be able to specify deps
@@ -35,5 +31,11 @@
 - IMPORTANT: exception throwing needs to be handled differently that C++ throwing
 	- Or better yet... don't add exceptions at all!
 		- Just have an error class in the stdlib with a bunch of error constants
-- Make ULR.Hosting.dll more usable within an application (e.g. return error codes rather than printing diagnostic messages)
+- add JIT read-only API (no compile, like Loader::ReadNativeAssembly)
 - IMPORTANT: FIX GC
+- Use utf8 everywhere
+- update readme
+- Convert macros in headers to constexpr or inline functions
+- have types store their own "storage sizes" for locals & heap allocs
+- reminder: valtypes padded to 8 bytes for malloc store so that copies of them can be made irrespective of the size
+	- do the same for heap allocs? (or no because user-defined methods should copy them)

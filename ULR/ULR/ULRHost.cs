@@ -21,9 +21,19 @@ static partial class ULRHost
 		string debuggerPath,
 		string stdlibPath,
 		int argc,
-		[MarshalAs(UnmanagedType.LPArray, ArraySubType = UnmanagedType.LPStr)] string[] argv
+		[MarshalAs(UnmanagedType.LPArray, ArraySubType = UnmanagedType.LPStr)] in string[] argv
 	);
 	
+	[LibraryImport($"ULR.Hosting.dll", StringMarshalling = StringMarshalling.Custom, StringMarshallingCustomType = typeof(System.Runtime.InteropServices.Marshalling.AnsiStringMarshaller))]
+	[UnmanagedCallConv(CallConvs = new Type[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
+	private static partial HostingResult HostJITAssembly(
+		string assemblyName,
+		string debuggerPath,
+		string stdlibPath,
+		int argc,
+		[MarshalAs(UnmanagedType.LPArray, ArraySubType = UnmanagedType.LPStr)] in string[] argv
+	);
+
 	public static int HostNative(
 		string assemblyName,
 		string debuggerPath,
@@ -34,6 +44,22 @@ static partial class ULRHost
 		string[] argv = [assemblyName, ..args];
 		
 		var res = HostNativeAssembly(assemblyName, debuggerPath, stdlibPath, argv.Length, argv);
+	
+		if (res.Error != 0) throw new ULRInternalException(res.Error);
+
+		return res.RetCode;
+	}
+	
+	public static int HostJIT(
+		string assemblyName,
+		string debuggerPath,
+		string stdlibPath,
+		IEnumerable<string> args
+	)
+	{
+		string[] argv = [assemblyName, ..args];
+		
+		var res = HostJITAssembly(assemblyName, debuggerPath, stdlibPath, argv.Length, argv);
 	
 		if (res.Error != 0) throw new ULRInternalException(res.Error);
 

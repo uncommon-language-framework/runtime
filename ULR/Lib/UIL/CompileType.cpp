@@ -178,7 +178,9 @@ namespace ULR::IL
 				{
 					FieldInfo* field = (FieldInfo*) type->static_attrs[name][0];
 
-					void* offset = malloc(valtype->size);
+					void* offset = malloc(
+						GetStorageSizex64(valtype)
+					);
 
 					malloc_alloced.push_back(offset);
 
@@ -192,6 +194,10 @@ namespace ULR::IL
 					i+=2; // skip two bytes of what would be offset
 
 					field->valtype = valtype;
+
+					field->offset = (void*) type->size;
+
+					type->size+=IsBoxableStruct(field->valtype) ? (field->valtype->size) : 8; // 8 bytes for x64
 				}
 			}
 			else if (il[i] == BeginMethod)
@@ -261,7 +267,7 @@ namespace ULR::IL
 
 					Type* argtype = api->GetType(argname);
 
-					size_t arg_store_size = IsBoxableStruct(argtype) ? argtype->size : 8; 
+					size_t arg_store_size = GetStorageSizex64(argtype); 
 
 					curr_method->argsig.push_back(argtype);
 					
@@ -269,27 +275,27 @@ namespace ULR::IL
 					switch (curr_method->argsig.size())
 					{
 						case 1: // mov [rbp+24], rcx
-							argpassedlocals.push_back({ 24, arg_store_size });
+							argpassedlocals.push_back({ 24, arg_store_size, IsBoxableStruct(argtype) });
 
 							code.insert(code.end(), { 0x48, 0x89, 0x4D, 0x18 });
 							break;
 						case 2: // mov [rbp+32], rdx
-							argpassedlocals.push_back({ 32, arg_store_size });
+							argpassedlocals.push_back({ 32, arg_store_size, IsBoxableStruct(argtype) });
 
 							code.insert(code.end(), { 0x48, 0x89, 0x55, 0x20 });
 							break;
 						case 3: // mov [rbp+40], r8
-							argpassedlocals.push_back({ 40, arg_store_size });
+							argpassedlocals.push_back({ 40, arg_store_size, IsBoxableStruct(argtype) });
 
 							code.insert(code.end(), { 0x4C, 0x89, 0x45, 0x28 });
 							break;												
 						case 4: // mov [rbp+48], r9
-							argpassedlocals.push_back({ 48, arg_store_size });
+							argpassedlocals.push_back({ 48, arg_store_size, IsBoxableStruct(argtype) });
 
 							code.insert(code.end(), { 0x4C, 0x89, 0x4D, 0x30 });
 							break;												
 						default:
-							argpassedlocals.push_back({ (int) (48+(curr_method->argsig.size()-4)*8), arg_store_size }); // todo: find which stack addr args start from (replace 64)
+							argpassedlocals.push_back({ (int) (48+(curr_method->argsig.size()-4)*8), arg_store_size });
 							// for above also see argsig.size() may need to use total args-argsig.size() (reverse take) (grab total args from reading phase?)
 							break;
 					}
@@ -314,12 +320,12 @@ namespace ULR::IL
 							i++;
 							{
 								Type* lcl_type = api->GetType(LookupString(&il[i], string_ref));
-								size_t lcl_store_size = IsBoxableStruct(lcl_type) ? lcl_type->size : 8; 
+								size_t lcl_store_size = IsBoxableStruct(lcl_type) ? lcl_type->size : 8;
 
 
 								i+=4; // skip four bytes for string lookup
 
-								locals.push_back({ (int) (-locals_size), lcl_store_size });
+								locals.push_back({ (int) (-locals_size), lcl_store_size, IsBoxableStruct(lcl_type) });
 
 								locals_size+=lcl_type->size; // todo: check if this offset is correct
 							}

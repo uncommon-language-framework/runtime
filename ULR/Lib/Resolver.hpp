@@ -10,6 +10,11 @@
 
 #define GC_TRIGGERED_EXC_CODE 0xC001F00D
 
+constexpr inline size_t PadToNextWordx64(size_t size)
+{
+	return ((size+7) >> 3) << 3;
+}
+
 namespace ULR::IL { class JITContext; }
 
 namespace ULR::Resolver
@@ -127,7 +132,7 @@ namespace ULR::Resolver
 			template <typename ValueType>
 			char* Box(ValueType& obj, Type* typeptr)
 			{
-				size_t alloc_size = sizeof(Type*)+std::max(sizeof(ValueType), sizeof(intptr_t)); // if size < ptr_size, extend (pad) to at least ptr_size bytes (8 for x64 impl)
+				constexprsize_t alloc_size = sizeof(Type*)+PadToNextWordx64(sizeof(ValueType));
 
 				Type** boxed = (Type**) AllocateObject(alloc_size);
 
