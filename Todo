@@ -39,3 +39,15 @@
 - have types store their own "storage sizes" for locals & heap allocs
 - reminder: valtypes padded to 8 bytes for malloc store so that copies of them can be made irrespective of the size
 	- do the same for heap allocs? (or no because user-defined methods should copy them)
+
+- AllocL was removed because the compiler could just create a local for it (also, we can't keep this contract within a loop)
+	- Usecase to add it back?
+	- Removed AllocS also & replaced with NewS/NewL
+
+- Make sure ULRAPI & JIT are compilant with Spec `ULF->Storage->Value Types`
+	- MethodInfo::Invoke (and ctorinfo for that matter)
+	- All JIT storage
+	- ULRAPI boxing/unboxing
+	- Native Loader (pad size)
+	- JIT Loader (pad size)
+

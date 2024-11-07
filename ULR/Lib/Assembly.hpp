@@ -13,12 +13,6 @@
 
 #pragma once
 
-#define IsBoxableStruct(typeptr) (typeptr->decl_type == TypeType::Struct)
-#define IsEvenStructSize(typeptr) (typeptr->size == 1 || typeptr->size == 2 || typeptr->size == 4 || typeptr->size == 8)
-// everything <= 8 should be friendly since the rest of the bytes would be padding
-#define IsFriendlyStructSizex64(typeptr) (typeptr->size <= 8)
-#define NeedsCallAllocatedSpace(typeptr) IsBoxableStruct(typeptr) && !IsFriendlyStructSizex64(typeptr)
-
 namespace ULR
 {
 	namespace IL
@@ -252,6 +246,29 @@ namespace ULR
 			Assembly(char* name, char* path, char* meta, size_t metalen, void** addr, char** deps, HMODULE handle);
 			~Assembly();
 	};
+}
 
-	bool IsFloatingPointType(Type* typeptr);
+inline bool IsBoxableStruct(ULR::Type* type)
+{
+	return (type->decl_type == ULR::TypeType::Struct);
+}
+
+inline bool IsEvenStructSize(ULR::Type* type)
+{
+	return (type->size == 1 || type->size == 2 || type->size == 4 || type->size == 8);
+}
+inline bool IsFriendlyStructSizex64(ULR::Type* type)
+{
+	// everything <= 8 should be friendly since the rest of the bytes would be padding
+	return (type->size <= 8);
+}
+
+inline bool NeedsCallAllocatedSpace(ULR::Type* type)
+{
+	return IsBoxableStruct(type) && !IsFriendlyStructSizex64(type);
+}
+
+inline bool IsFloatingPointType(ULR::Type* type)
+{
+	return (type->name == "[System]Float32") || (type->name == "[System]Float64");
 }

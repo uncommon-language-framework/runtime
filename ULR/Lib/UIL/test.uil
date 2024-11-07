@@ -1,4 +1,4 @@
-public class Program:
+public class [FirstProject]Program:
 	public static [System]Int32 Main([System]String):
 		.local [System]String[]
 		.local [System]Int32
@@ -6,8 +6,7 @@ public class Program:
 		ldapl 0
 		stapl 0
 
-		ldstr "Hello, World!" // args passed in reverse order
-		ldfnp 
+		ldstr "Hello, World!" // args passed in reverse order 
 		call static [System]Void [System.Console]::WriteLine([System]String)
 
 
@@ -16,6 +15,7 @@ public class Program:
 		ldnc i32 5
 		add i32
 		stloc 1
+		allocs [FirstProject]Configuration
 
 		ldloc 1
 		call static [System]Void [System.Console]::WriteLine([System]Int32)

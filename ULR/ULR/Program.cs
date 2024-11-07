@@ -14,10 +14,10 @@ public class Program
 		public bool UseNativeAssembly { get; set; } = false;
 
 		[Option('d', "debugger", HelpText = "Specify a path to a custom debugger")]
-		public string DebuggerPath { get; set; } = $"ULR.Debugging.dll";
+		public string DebuggerPath { get; set; } = "ULR.Debugging.dll";
 
 		[Option('s', "stdlib", HelpText = "Specify a path to the standard library")]
-		public string StdlibPath { get; set; } = $"ULR.CoreLib.Native.dll";
+		public string StdlibPath { get; set; } = "ULR.CoreLib.Native.dll";
 
 		[Value(0, HelpText = "Path to the assembly to run", Required = true)]
 		public string AssemblyName { get; set; } = null!;

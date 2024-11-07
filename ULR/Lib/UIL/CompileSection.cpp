@@ -866,6 +866,30 @@ namespace ULR::IL
 					}
 
 					break;
+				case LdElem:
+					i++;
+					
+					num_eval_stack_elems-=1; // net change (pops off index & array ptr)
+					
+					auto type_name = LookupString(&il[i], string_ref);
+
+					i+=4;
+
+					Type* elem_type = internal_api->GetType(type_name);
+
+					// pop rax
+					// pop rbx
+					// add rax, sizeof(void*)
+					// mul rbx, elem_type->storage_size
+					// add rax, rbx
+					// load_from_address(rax) -> TODO: extract this to a function that ldloc, ldapl, and ldfld use
+
+			
+					break;
+				case LdLst:
+					num_eval_stack_elems+=1;
+					code.insert(code.end(), { 0x48, 0x83, 0xEC, 0x08 }); // sub rsp, 8
+					break;
 				case Call:
 					i++; // skip opcode
 					
@@ -1484,6 +1508,32 @@ namespace ULR::IL
 							}
 						}
 					}
+					break;
+				case NewArr:
+					i++;
+
+					num_eval_stack_elems+=0; // net change
+
+					{
+
+						auto type_name = std::string(LookupString(&il[i], string_ref));
+
+						i+=4; // skip string ref
+
+						Type* elem_type = internal_api->GetType(type_name);
+						Type* array_type = internal_api->GetArrayTypePrimarily(type_name+"[]");
+
+						auto allocator = Resolver::ULRAPIImpl::AllocateZeroed;
+						
+						// pop edx [array size now in edx]
+						// mul edx, StorageSize(elem_type) ; add lea optimization later for friendly sizes
+						// add edx, sizeof(Type*)
+						// mov ecx, internal_api
+						// call allocator
+						// mov [eax], array_type
+						// push eax
+					}
+					
 					break;
 				case Ret:
 					i++;

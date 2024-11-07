@@ -7,7 +7,10 @@
 #error "No UIL JIT support for non-windows x64 platforms currently"
 #endif
 
-#define GetStorageSizex64(type) IsBoxableStruct(type) ? PadToNextWordx64(type->size) : 8
+inline size_t GetStorageSizex64(ULR::Type* type)
+{
+	return IsBoxableStruct(type) ? PadToNextWordx64(type->size) : 8;
+}
 
 namespace ULR::IL
 {
@@ -87,14 +90,14 @@ namespace ULR::IL
 		Not,
 		Xor,
 		CstNV, // Cast Numerical Value
-		LdStr, // to fix GC problem with ldstr, maybe allocate separately (on own) & delete at the end of JITContext
+		LdStr, // load string
 		LdNC, // load numerical constant
 		LdFld, // load field
 		LdLoc, // load local
 		LdAPL, // load argument-passed local
 		LdElem, // load element
 		LdITO, // may remove, probably useless [load internal type object]
-		LdETO, // may remove, may not be feasible (also same GC problem?) [load external type object]
+		LdETO, // may remove, [load external type object]
 		LdLst, // load last - pushes the most recently popped item back onto the evaluation stack (this is only guaranteed to work after a StXXX instruction and cannot be used successively)
 		VTSCp, // ValueType Stack Copy [may remove - find uses?]
 		Call,
@@ -105,9 +108,10 @@ namespace ULR::IL
 		StLoc, // store local
 		StAPL, // store argument-passed local
 		StElem, // store element
-		AllocS, // allocate (but don't initialize) new object [short lifetime - until next valtype allocation by Call/VCall or AllocS]
-		AllocL, // allocate (but don't initialize) new object [long lifetime]
-		NewArr, // create array
+		CtObjSS, // construct new object on stack (short lifetime, only guaranteed to last until next call/vcall/ctobjs* allocation or end of section/scope, whichever comes first)
+		CtObjSL, // construct new object on stack (long lifetime, guaranteed to last until end of section/scope)
+		CtObjH, // construct new object on heap (heap lifetime, guaranteed to last until all references are lost)
+		NewArr, // allocate new array
 		Ret,
 		
 		/* Jumping Instructions */
@@ -136,6 +140,7 @@ namespace ULR::IL
 		BeginSection,
 		EndAssembly,
 		NewArg,
+		Dependency,
 
 		FieldDecl,
 		LocalDecl,
@@ -145,7 +150,9 @@ namespace ULR::IL
 	{
 		Static,
 		Instance,
-		Ctor
+		Ctor,
+		ULAS,
+		Native
 	};
 
 	enum NumericalTypeIdentifier : byte

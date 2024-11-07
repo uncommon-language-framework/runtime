@@ -22,6 +22,17 @@ namespace ULR::IL
 
 		size_t size = *((uint32_t*) &il[i]); // yes, the size is supposed to be a size_t but objects shouldn't (and can't) be larger than UINT32_MAX, so only four bytes are needed to store the size
 
+
+		if (decl_type == TypeType::Struct) // ensure structs are padded properly
+		{
+			unsigned char rem = size % 8;
+
+			if (rem == 3) size++;
+			else if (rem == 5) size+=3;
+			else if (rem == 6) size+=2;
+			else if (rem == 7) size++;
+		}
+
 		i+=4; // skip four bytes from size 
 
 		Type* type = new Type(decl_type, meta_asm, strdup(std::string(LookupString(&il[i], string_ref)).c_str()), attrs, size, {}, nullptr, false, 0);
@@ -271,7 +282,7 @@ namespace ULR::IL
 
 					curr_method->argsig.push_back(argtype);
 					
-					// we grab args from [rbp+24] to [rbp+48]++ because we save two registers -- retaddr @ [rbp] (because now rbp == old rsp), first reg saved @ [rbp+8], second reg saved @ [rbp+16]
+					// we grab args from [rbp+24] to [rbp+48]++ because we save two registers -- retaddr @ [rbp+0] (because now rbp == old rsp), first reg saved @ [rbp+8], second reg saved @ [rbp+16]
 					switch (curr_method->argsig.size())
 					{
 						case 1: // mov [rbp+24], rcx

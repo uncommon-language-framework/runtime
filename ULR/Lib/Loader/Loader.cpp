@@ -176,6 +176,16 @@ namespace ULR::Loader
 
 			size_t size = std::stoull(size_str);
 
+			if (class_type == TypeType::Struct) // ensure structs are padded properly
+			{
+				unsigned char rem = size % 8;
+
+				if (rem == 3) size++;
+				else if (rem == 5) size+=3;
+				else if (rem == 6) size+=2;
+				else if (rem == 7) size++;
+			}
+
 			Type* type = new Type(class_type, assembly, strdup((ns_name+type_name).c_str()), modflags, size, std::vector<Type*>(), nullptr, false, 0);
 
 			/* Skip Members */

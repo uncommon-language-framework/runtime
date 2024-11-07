@@ -10,7 +10,7 @@
 
 #define GC_TRIGGERED_EXC_CODE 0xC001F00D
 
-constexpr inline size_t PadToNextWordx64(size_t size)
+inline size_t PadToNextWordx64(size_t size)
 {
 	return ((size+7) >> 3) << 3;
 }
@@ -132,7 +132,7 @@ namespace ULR::Resolver
 			template <typename ValueType>
 			char* Box(ValueType& obj, Type* typeptr)
 			{
-				constexprsize_t alloc_size = sizeof(Type*)+PadToNextWordx64(sizeof(ValueType));
+				constexprsize_t alloc_size = sizeof(Type*)+sizeof(ValueType);
 
 				Type** boxed = (Type**) AllocateObject(alloc_size);
 
