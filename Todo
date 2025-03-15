@@ -40,14 +40,14 @@
 - reminder: valtypes padded to 8 bytes for malloc store so that copies of them can be made irrespective of the size
 	- do the same for heap allocs? (or no because user-defined methods should copy them)
 
-- AllocL was removed because the compiler could just create a local for it (also, we can't keep this contract within a loop)
+- AllocL was removed because the compiler could just create a local for it
+	- Realized we *can* keep the contract in a loop because a loop body scope constitutes one section
 	- Usecase to add it back?
 	- Removed AllocS also & replaced with NewS/NewL
 
 - Make sure ULRAPI & JIT are compilant with Spec `ULF->Storage->Value Types`
 	- MethodInfo::Invoke (and ctorinfo for that matter)
 	- All JIT storage
-	- ULRAPI boxing/unboxing
-	- Native Loader (pad size)
-	- JIT Loader (pad size)
+		- As a side note but still related, all locals must be aligned
 
+- Migrate to Namespace.Name notation from [Namespace]Name
