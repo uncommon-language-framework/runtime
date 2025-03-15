@@ -80,8 +80,8 @@ if ($args[2] -ne "nolib")
 
 
 Copy-Item "ULR.NativeLib.dll" "$($args[0])/ULR.NativeLib.dll"
-Copy-Item "ULR.NativeLib.dll" "../../ulflib/src/native/ULR.NativeLib.dll"
-Copy-Item "ULR.NativeLib.dll" "../../uld/src/uld/ULR.NativeLib.dll"
+Copy-Item "ULR.NativeLib.dll" "../../stdlib/src/native/ULR.NativeLib.dll"
+Copy-Item "ULR.NativeLib.dll" "../../debugger/src/uld/ULR.NativeLib.dll"
 
 if  ($args[2] -ne "libonly")
 {

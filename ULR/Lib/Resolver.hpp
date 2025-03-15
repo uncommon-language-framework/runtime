@@ -132,7 +132,7 @@ namespace ULR::Resolver
 			template <typename ValueType>
 			char* Box(ValueType& obj, Type* typeptr)
 			{
-				constexprsize_t alloc_size = sizeof(Type*)+sizeof(ValueType);
+				constexpr size_t alloc_size = sizeof(Type*)+sizeof(ValueType);
 
 				Type** boxed = (Type**) AllocateObject(alloc_size);
 

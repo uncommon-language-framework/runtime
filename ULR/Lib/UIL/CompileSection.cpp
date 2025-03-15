@@ -870,23 +870,26 @@ namespace ULR::IL
 					i++;
 					
 					num_eval_stack_elems-=1; // net change (pops off index & array ptr)
-					
-					auto type_name = LookupString(&il[i], string_ref);
+					{
+						
+						auto type_name = LookupString(&il[i], string_ref);
 
-					i+=4;
+						i+=4;
 
-					Type* elem_type = internal_api->GetType(type_name);
+						Type* elem_type = internal_api->GetType(type_name);
 
-					// pop rax
-					// pop rbx
-					// add rax, sizeof(void*)
-					// mul rbx, elem_type->storage_size
-					// add rax, rbx
-					// load_from_address(rax) -> TODO: extract this to a function that ldloc, ldapl, and ldfld use
-
+						// pop rax
+						// pop rbx
+						// add rax, sizeof(void*)
+						// mul rbx, elem_type->storage_size
+						// add rax, rbx
+						// load_from_address(rax) -> TODO: extract this to a function that ldloc, ldapl, and ldfld use
+					}
 			
 					break;
 				case LdLst:
+					i++; // skip opcode
+
 					num_eval_stack_elems+=1;
 					code.insert(code.end(), { 0x48, 0x83, 0xEC, 0x08 }); // sub rsp, 8
 					break;

@@ -270,5 +270,5 @@ inline bool NeedsCallAllocatedSpace(ULR::Type* type)
 
 inline bool IsFloatingPointType(ULR::Type* type)
 {
-	return (type->name == "[System]Float32") || (type->name == "[System]Float64");
+	return strcmp(type->name, "[System]Float32") == 0 || strcmp(type->name, "[System]Float64") == 0;
 }

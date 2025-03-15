@@ -14,7 +14,7 @@ void overload0_ns0_Program_ctor(char* self) {}
 
 sizeof_ns1_System_Int32 overload0_ns0_Program_Main(char* argv)
 {
-	Assembly* jitasm = internal_api->LoadJITAssembly("/Users/carlf/programs/ulr/Tests/LoadJITAsm/adder.uil.ulas");
+	Assembly* jitasm = internal_api->LoadJITAssembly("/Users/carlf/programs/ulrproject/runtime/Tests/LoadJITAsm/adder.uil.ulas");
 
 	Type* Int32Type = internal_api->GetType("[System]Int32");
 
@@ -27,7 +27,6 @@ sizeof_ns1_System_Int32 overload0_ns0_Program_Main(char* argv)
 	std::cout << addinfo->offset << std::endl;
 
 	auto add = (int (*)(int, int)) addinfo->offset;
-
 
 	int a = 4;
 	int b = 5;

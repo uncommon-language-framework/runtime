@@ -190,7 +190,7 @@ namespace ULR::Resolver
 			if (casted->argsig == signature) return casted;
 		}
 		
-		throw /* new NoConstructor exc*/;
+		return nullptr;
 	}
 
 	MethodInfo* ULRAPIImpl::GetMethod(Type* type, std::string_view name, std::vector<Type*> argsignature, int bindingflags)
