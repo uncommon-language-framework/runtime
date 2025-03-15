@@ -57,24 +57,24 @@ if ($args[2] -ne "nolib")
 {
 	if ($debug)
 	{
-		g++64 $libfiles -c -masm=intel -O0 -Wall -g -D DEBUG=true -Wno-write-strings -std=c++17
+		g++ $libfiles -c -masm=intel -O0 -Wall -g -D DEBUG=true -Wno-write-strings -std=c++17
 	}
 	else
 	{
-		g++64 $libfiles -c -masm=intel -Wno-write-strings -std=c++17 
+		g++ $libfiles -c -masm=intel -Wno-write-strings -std=c++17 
 	}
 
 	if ($debug)
 	{
 		Move-Item *.o ObjCache/LibDbgObj -Force
 	
-		g++64 -shared -o "ULR.NativeLib.dll" ObjCache/LibDbgObj/*.o $winlibs
+		g++ -shared -o "ULR.NativeLib.dll" ObjCache/LibDbgObj/*.o $winlibs
 	}
 	else
 	{
 		Move-Item *.o ObjCache/LibObj -Force
 	
-		g++64 -shared -o "ULR.NativeLib.dll" ObjCache/LibObj/*.o $winlibs
+		g++ -shared -o "ULR.NativeLib.dll" ObjCache/LibObj/*.o $winlibs
 	}
 }
 
@@ -87,21 +87,21 @@ if  ($args[2] -ne "libonly")
 {
 	if ($debug)
 	{
-		if ((IsCachedOrStoreIfNot((Get-Item "ulrhost.cpp").FullName)) -eq 0) { g++64 "ulrhost.cpp" -c -masm=intel -O0 -Wall -g -D DEBUG=true -Wno-write-strings -std=c++17 -ldbghelp }
-		if ((IsCachedOrStoreIfNot((Get-Item "Lib/Loader/Loader.cpp").FullName)) -eq 0) { g++64 "Lib/Loader/Loader.cpp" -c -masm=intel -O0 -Wall -g -D DEBUG=true -Wno-write-strings -std=c++17 -ldbghelp }
+		if ((IsCachedOrStoreIfNot((Get-Item "ulrhost.cpp").FullName)) -eq 0) { g++ "ulrhost.cpp" -c -masm=intel -O0 -Wall -g -D DEBUG=true -Wno-write-strings -std=c++17 -ldbghelp }
+		if ((IsCachedOrStoreIfNot((Get-Item "Lib/Loader/Loader.cpp").FullName)) -eq 0) { g++ "Lib/Loader/Loader.cpp" -c -masm=intel -O0 -Wall -g -D DEBUG=true -Wno-write-strings -std=c++17 -ldbghelp }
 		
 		Move-Item *.o ObjCache/DbgObj -Force
 
-		g++64 "ObjCache/DbgObj/ulrhost.o" "ULR.NativeLib.dll" "ObjCache/DbgObj/Loader.o" -o "ULR.Hosting.dll" -shared -masm=intel -Wno-write-strings -std=c++17 -ldbghelp
+		g++ "ObjCache/DbgObj/ulrhost.o" "ULR.NativeLib.dll" "ObjCache/DbgObj/Loader.o" -o "ULR.Hosting.dll" -shared -masm=intel -Wno-write-strings -std=c++17 -ldbghelp
 	}
 	else
 	{
-		if ((IsCachedOrStoreIfNot((Get-Item "ulrhost.cpp").FullName)) -eq 0) { g++64 "ulrhost.cpp" -c -masm=intel -Wno-write-strings -std=c++17 -ldbghelp }
-		if ((IsCachedOrStoreIfNot((Get-Item "Lib/Loader/Loader.cpp").FullName)) -eq 0) { g++64 "Lib/Loader/Loader.cpp" -c -masm=intel -Wno-write-strings -std=c++17 -ldbghelp }
+		if ((IsCachedOrStoreIfNot((Get-Item "ulrhost.cpp").FullName)) -eq 0) { g++ "ulrhost.cpp" -c -masm=intel -Wno-write-strings -std=c++17 -ldbghelp }
+		if ((IsCachedOrStoreIfNot((Get-Item "Lib/Loader/Loader.cpp").FullName)) -eq 0) { g++ "Lib/Loader/Loader.cpp" -c -masm=intel -Wno-write-strings -std=c++17 -ldbghelp }
 
 		Move-Item *.o ObjCache/Obj -Force
 
-		g++64 "ObjCache/Obj/ulrhost.o" "ULR.NativeLib.dll" "ObjCache/Obj/Loader.o" -o "ULR.Hosting.dll" -shared -masm=intel -Wno-write-strings -std=c++17 -ldbghelp
+		g++ "ObjCache/Obj/ulrhost.o" "ULR.NativeLib.dll" "ObjCache/Obj/Loader.o" -o "ULR.Hosting.dll" -shared -masm=intel -Wno-write-strings -std=c++17 -ldbghelp
 	}
 }
 
