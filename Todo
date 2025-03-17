@@ -49,5 +49,6 @@
 	- MethodInfo::Invoke (and ctorinfo for that matter)
 	- All JIT storage
 		- As a side note but still related, all locals must be aligned
-
+- URGENT: REFACTOR PROJECT TO NOTE MAKE IT A COMPLETE PAIN
+	- USE A BUILD SYSTEM
 - Migrate to Namespace.Name notation from [Namespace]Name

@@ -675,7 +675,7 @@ namespace ULR::IL
 
 										code.insert(code.end(), { 0x8B, 0x00 }); // mov eax, [rax]
 										break;
-									default:
+									default: // BAD IDEA: IF FIELD VALUE CHANGES, THEN THIS WILL BE POINTING TO THE WRONG VALUE
 										code.insert(code.end(), { 0x48, 0xA1 }); // mov, rax
 
 										filled_later = LogMalloc(sizeof(void*));

@@ -26,6 +26,13 @@ sizeof_ns1_System_Int32 overload0_ns0_Program_Main(char* argv)
 
 	std::cout << addinfo->offset << std::endl;
 
+	internal_api->Breakpoint({
+		.source_filename = "AssemblyInfo.cpp",
+		.source_lineno = 29,
+		.source_line = "<no source available>",
+		.breakpoint_no = 0,
+	});
+
 	auto add = (int (*)(int, int)) addinfo->offset;
 
 	int a = 4;
