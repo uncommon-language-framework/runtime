@@ -411,7 +411,7 @@ namespace ULR::IL
 			else return { "Expected field or method declaration signal", CompilationError::ErrorCode::SignalExpected, &il[i] };
 		}
 
-		internal_api->PopulateVtablePtr(type);
+		internal_api->loader->PopulateVtable(type);
 
 		i++; // skip EndType signal
 

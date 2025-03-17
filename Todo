@@ -25,9 +25,11 @@
 	- Another memory opt -- since we have to allocate full pages anyway, maybe try to fit multiple functions on one page
 	- use std::list to reduce number of large reallocations before full function page is allocated
 - NOTE: MethodInfo::Invoke and JIT are not compatible with return values case 2 [here](https://learn.microsoft.com/en-us/cpp/build/x64-calling-convention?view=msvc-170#example-of-return-value-2---128-bit-result) (probably won't fix)
+
+
 - Have support for executing with a JIT-only assembly (e.g. UIL binary)
 	- TODO: have JIT only asms be able to specify deps
-
+	- Have JIT entrypoint directive
 - IMPORTANT: exception throwing needs to be handled differently that C++ throwing
 	- Or better yet... don't add exceptions at all!
 		- Just have an error class in the stdlib with a bunch of error constants
@@ -52,3 +54,4 @@
 - URGENT: REFACTOR PROJECT TO NOTE MAKE IT A COMPLETE PAIN
 	- USE A BUILD SYSTEM
 - Migrate to Namespace.Name notation from [Namespace]Name
+- TODO: normalize Read/Loaded assemblies

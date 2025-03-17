@@ -51,30 +51,6 @@ namespace ULR::IL
 		using LocalLookupTable = std::vector<LocalInfo>;		
 	}
 
-	struct CompilationError
-	{
-		enum ErrorCode
-		{
-			None,
-			TypeExpected,
-			MemberExpected,
-			InvalidInstr,
-			LocalTypeExpected,
-			InvalidTypeIdentifer,
-			InvalidDirective,
-			SignalExpected
-		};
-
-		char* error;
-		ErrorCode code;
-		byte* byte_at;
-
-		operator bool()
-		{
-			return code != ErrorCode::None;
-		}
-	};
-
 	constexpr CompilationError NoError { nullptr, CompilationError::ErrorCode::None, nullptr };
 
 	enum OpCodes : byte

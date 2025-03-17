@@ -11,14 +11,9 @@ using ULR::Resolver::BindingFlags;
 
 extern ULR::Resolver::ULRAPIImpl* internal_api;
 
-namespace ULR::Loader
+namespace ULR
 {
-	std::map<std::string_view, Assembly*> ReadAssemblies;
-	std::map<std::string_view, Assembly*> LoadedAssemblies;
-
-	std::vector<GenericPlaceholder*> alloced_generic_placeholders;
-
-	ULRResult<HMODULE> ReadNativeAssembly(const char* dll)
+	ULRResult<HMODULE> Loader::ReadNativeAssembly(const char* dll)
 	{
 		HMODULE mod = LoadLibraryA(dll);
 
@@ -202,7 +197,7 @@ namespace ULR::Loader
 		return { mod, None };
 	}
 
-	ULRResult<Assembly*> LoadNativeAssembly(const char* dll, Resolver::ULRAPIImpl* api)
+	ULRResult<Assembly*> Loader::LoadNativeAssembly(const char* dll, Resolver::ULRAPIImpl* api)
 	{
 		std::string as_str = dll;
 		std::string shortname_str = as_str.substr(as_str.find_last_of("/\\") + 1);
@@ -816,7 +811,7 @@ namespace ULR::Loader
 		return { assembly, None };
 	}
 
-	ULRResult<std::vector<Type*>> ParseArgs(size_t* i, char* meta)
+	ULRResult<std::vector<Type*>> Loader::ParseArgs(size_t* i, char* meta)
 	{
 		std::vector<Type*> argtypes;
 
@@ -844,7 +839,7 @@ namespace ULR::Loader
 		return { argtypes, None };
 	}
 
-	ULRResult<Type*> GetType(std::string_view qual_name)
+	ULRResult<Type*> Loader::GetType(std::string_view qual_name)
 	{
 		if (qual_name[0] == 'T')
 		{
@@ -903,7 +898,7 @@ namespace ULR::Loader
 	// TODO: make this work for props (prob just add the prop MethodInfos to type attrs during loading)
 	// NOTE: must be called after loading
 	// TODO: remove a LOT of duplicate work here
-	void PopulateVtable(Type* type)
+	void Loader::PopulateVtable(Type* type)
 	{
 		/* Begin Primary Vtable */
 

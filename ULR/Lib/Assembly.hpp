@@ -18,6 +18,30 @@ namespace ULR
 	namespace IL
 	{
 		class AssemblyJITInfo;
+
+		struct CompilationError
+		{
+			enum ErrorCode
+			{
+				None,
+				TypeExpected,
+				MemberExpected,
+				InvalidInstr,
+				LocalTypeExpected,
+				InvalidTypeIdentifer,
+				InvalidDirective,
+				SignalExpected
+			};
+	
+			char* error;
+			ErrorCode code;
+			byte* byte_at;
+	
+			operator bool()
+			{
+				return code != ErrorCode::None;
+			}
+		};
 	}
 
 	enum ULRInternalError : int
@@ -33,12 +57,14 @@ namespace ULR
 		EntryPointNotFound,
 	};
 
-	template <typename T> struct ULRResult
+	template <typename T, typename TErrorInfo = char> struct ULRResult
 	{
 		public:
 			T result;
 			ULRInternalError error;
+			TErrorInfo error_info;
 	};
+
 
 	enum TypeType : byte // also used with IL
 	{

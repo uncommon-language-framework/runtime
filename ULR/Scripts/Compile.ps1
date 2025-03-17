@@ -48,8 +48,6 @@ $winlibs = "-lole32", "-luuid", "-ldbghelp"
 
 foreach ($item in Get-ChildItem ./Lib -File -Recurse)
 {
-	if ($item.FullName.Contains("Loader")) { continue; }
-
 	if ($item.FullName.EndsWith(".cpp") -and ((IsCachedOrStoreIfNot($item.FullName)) -eq 0)) { $libfiles.Add($item.FullName) }
 }
 
@@ -88,20 +86,18 @@ if  ($args[2] -ne "libonly")
 	if ($debug)
 	{
 		if ((IsCachedOrStoreIfNot((Get-Item "ulrhost.cpp").FullName)) -eq 0) { g++ "ulrhost.cpp" -c -masm=intel -O0 -Wall -g -D DEBUG=true -Wno-write-strings -std=c++17 -ldbghelp }
-		if ((IsCachedOrStoreIfNot((Get-Item "Lib/Loader/Loader.cpp").FullName)) -eq 0) { g++ "Lib/Loader/Loader.cpp" -c -masm=intel -O0 -Wall -g -D DEBUG=true -Wno-write-strings -std=c++17 -ldbghelp }
 		
 		Move-Item *.o ObjCache/DbgObj -Force
 
-		g++ "ObjCache/DbgObj/ulrhost.o" "ULR.NativeLib.dll" "ObjCache/DbgObj/Loader.o" -o "ULR.Hosting.dll" -shared -masm=intel -Wno-write-strings -std=c++17 -ldbghelp
+		g++ "ObjCache/DbgObj/ulrhost.o" "ULR.NativeLib.dll"  -o "ULR.Hosting.dll" -shared -masm=intel -Wno-write-strings -std=c++17 -ldbghelp
 	}
 	else
 	{
 		if ((IsCachedOrStoreIfNot((Get-Item "ulrhost.cpp").FullName)) -eq 0) { g++ "ulrhost.cpp" -c -masm=intel -Wno-write-strings -std=c++17 -ldbghelp }
-		if ((IsCachedOrStoreIfNot((Get-Item "Lib/Loader/Loader.cpp").FullName)) -eq 0) { g++ "Lib/Loader/Loader.cpp" -c -masm=intel -Wno-write-strings -std=c++17 -ldbghelp }
 
 		Move-Item *.o ObjCache/Obj -Force
 
-		g++ "ObjCache/Obj/ulrhost.o" "ULR.NativeLib.dll" "ObjCache/Obj/Loader.o" -o "ULR.Hosting.dll" -shared -masm=intel -Wno-write-strings -std=c++17 -ldbghelp
+		g++ "ObjCache/Obj/ulrhost.o" "ULR.NativeLib.dll"-o "ULR.Hosting.dll" -shared -masm=intel -Wno-write-strings -std=c++17 -ldbghelp
 	}
 }
 

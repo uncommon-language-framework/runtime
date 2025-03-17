@@ -1,4 +1,5 @@
 #include "Assembly.hpp"
+#include "Loader.hpp"
 #include <algorithm>
 #include <iostream>
 #include <type_traits>
@@ -45,8 +46,6 @@ namespace ULR::Resolver
 
 	class ULRAPIImpl
 	{
-		ULRResult<Assembly*> (*LoadAssemblyPtr)(const char name[], ULRAPIImpl* api);
-		ULRResult<HMODULE> (*ReadAssemblyPtr)(const char name[]);
 		void (*StaticDebug)(StaticDebugInfo& info);
 
 		size_t prev_size_accessible = 0;
@@ -56,29 +55,23 @@ namespace ULR::Resolver
 		std::mutex gc_lock;
 		std::mutex alloc_lock;
 		IL::JITContext* jit;
+		HMODULE debugger;
 
 		public:
+			Loader* loader = new Loader();
 			GCResult last_gc_result;
-			void (*PopulateVtablePtr)(Type* type);
 			std::map<char*, size_t> allocated_objs;
 			size_t allocated_size = 0;
 			std::vector<void*> allocated_field_offsets;
-			std::map<std::string_view, Assembly*>* assemblies;
-			std::map<std::string_view, Assembly*>* read_assemblies;
 
 			ULRAPIImpl(
-				std::map<std::string_view, Assembly*>* assemblies,
-				std::map<std::string_view, Assembly*>* read_assemblies,
-				ULRResult<HMODULE> (*ReadAssembly)(const char name[]),
-				ULRResult<Assembly*> (*LoadAssembly)(const char name[], ULRAPIImpl* api),
-				void (*PopulateVtable)(Type* type),
 				HMODULE debugger,
 				bool& debugger_load_successful
 			);
 
 			bool EnsureLoaded(std::string_view assembly_name);
 			Assembly* LoadNativeAssembly(std::string_view assembly_name);
-			Assembly* LoadJITAssembly(std::string jitasm_path);
+			ULRResult<Assembly*, IL::CompilationError>  LoadJITAssembly(std::string jitasm_path);
 			Assembly* LocateAssembly(std::string_view assembly_name);
 			void* LocateSymbol(Assembly* assembly, char symbol_name[]);
 
@@ -163,6 +156,8 @@ namespace ULR::Resolver
 			std::string GetDisplayNameOf(MemberInfo* member);
 			std::string GetDisplayNameOf(Type* member);
 			std::string GetStackTrace(int skipframes);
+
+			~ULRAPIImpl();
 	};
 }
 

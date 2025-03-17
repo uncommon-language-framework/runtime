@@ -22,21 +22,13 @@ const size_t MAX_TRACEBACK = 30;
 namespace ULR::Resolver
 {
 	ULRAPIImpl::ULRAPIImpl(
-		std::map<std::string_view, Assembly*>* assemblies,
-		std::map<std::string_view, Assembly*>* read_assemblies,
-		ULRResult<HMODULE> (*ReadAssembly)(const char name[]),
-		ULRResult<Assembly*> (*LoadAssembly)(const char name[], ULRAPIImpl* api),
-		void (*PopulateVtable)(Type* type),
 		HMODULE debugger,
 		bool& debugger_load_successful
 	)
 	{
-		this->assemblies = assemblies;
-		this->read_assemblies = read_assemblies;
-		this->LoadAssemblyPtr = LoadAssembly;
-		this->ReadAssemblyPtr = ReadAssembly;
-		this->PopulateVtablePtr = PopulateVtable;
+		this->loader = loader;
 		this->jit = new IL::JITContext(this);
+		this->debugger = debugger;
 
 		if (debugger)
 		{
@@ -61,11 +53,11 @@ namespace ULR::Resolver
 	{
 		std::string namecpp(assembly_name);
 
-		if (assemblies->count(assembly_name) == 0)
+		if (loader->LoadedAssemblies.count(assembly_name) == 0)
 		{
-			if (read_assemblies->count(assembly_name) == 0) return false;
+			if (loader->ReadAssemblies.count(assembly_name) == 0) return false;
 
-			LoadAssemblyPtr(namecpp.c_str(), this);
+			loader->LoadNativeAssembly(namecpp.c_str(), this);
 		}
 
 		return true;
@@ -75,19 +67,19 @@ namespace ULR::Resolver
 	{
 		std::string namecpp(assembly_name);
 
-		if (read_assemblies->count(assembly_name))
+		if (loader->ReadAssemblies.count(assembly_name))
 		{
-			if (assemblies->count(assembly_name)) return assemblies->at(assembly_name);
+			if (loader->LoadedAssemblies.count(assembly_name)) return loader->LoadedAssemblies.at(assembly_name);
 
-			return LoadAssemblyPtr(namecpp.c_str(), this).result;
+			return loader->LoadNativeAssembly(namecpp.c_str(), this).result;
 		}
 
-		ReadAssemblyPtr(namecpp.c_str());
+		loader->ReadNativeAssembly(namecpp.c_str());
 
-		return LoadAssemblyPtr(namecpp.c_str(), this).result;
+		return loader->LoadNativeAssembly(namecpp.c_str(), this).result;
 	}
 
-	Assembly* ULRAPIImpl::LoadJITAssembly(std::string jitasm_path) // todo: load jit deps
+	ULRResult<Assembly*, IL::CompilationError> ULRAPIImpl::LoadJITAssembly(std::string jitasm_path) // todo: load jit deps
 	{
 		char* asm_basename = strdup(jitasm_path.substr(jitasm_path.find_last_of("/\\") + 1).c_str());
 
@@ -114,34 +106,19 @@ namespace ULR::Resolver
 
 		auto err = jit->Compile(meta_asm, il, string_ref);
 
-		if (err)
-		{
-			std::cerr
-				<< "Could not load assembly: "
-				<< "ULR JIT Error: "
-				<< err.error
-				<< " at byte ["
-				<< (void*) err.byte_at
-				<< "] (il["
-				<< (size_t) (err.byte_at-il)
-				<< "]) value: "
-				<< (int) *err.byte_at
-				<< '\n';
+		if (err) { return { nullptr, InvalidAssembly, err }; }
 
-			return nullptr;
-		}
+		loader->ReadAssemblies.at(meta_asm->name) = meta_asm;
+		loader->LoadedAssemblies.at(meta_asm->name) = meta_asm;
 
-		read_assemblies->at(meta_asm->name) = meta_asm;
-		assemblies->at(meta_asm->name) = meta_asm;
-
-		return meta_asm;
+		return { meta_asm, None, nullptr};
 	}
 
 	Assembly* ULRAPIImpl::LocateAssembly(std::string_view assembly_name)
 	{
-		if (read_assemblies->count(assembly_name) != 0) return (*read_assemblies)[assembly_name];
+		if (loader->ReadAssemblies.count(assembly_name) != 0) return loader->ReadAssemblies[assembly_name];
 
-		return (*assemblies)[assembly_name];
+		return loader->LoadedAssemblies[assembly_name];
 	}
 
 	void* ULRAPIImpl::LocateSymbol(Assembly* assembly, char symbol_name[])
@@ -403,13 +380,13 @@ namespace ULR::Resolver
 
 		if (full_qual_typename[len-2] == '[' && full_qual_typename[len-1] == ']') // array type (ends with [])
 		{			
-			Assembly* ArrayTypeAssembly = (*assemblies)["ULR.<ArrayTypes>"];
+			Assembly* ArrayTypeAssembly = (loader->LoadedAssemblies)["ULR.<ArrayTypes>"];
 			
 			Type* elem_type = GetArrayTypePrimarily(std::string_view(full_qual_typename.data(), len-2)); // get inner element type (if it is a nested array, recursion will provide us the proper type)
 
 			Type* array_type = new Type(TypeType::ArrayType, ArrayTypeAssembly, strdup(const_cast<const char*>(std::string(full_qual_typename).c_str())), Modifiers::Public | Modifiers::Sealed, 0, { }, GetType("[System]Object"), elem_type);
 
-			PopulateVtablePtr(array_type);
+			loader->PopulateVtable(array_type);
 
 			ArrayTypeAssembly->types[array_type->name] = array_type; // use array_type->name because it is guaranteed to be dynamically allocated and last as long as array_type lasts
 
@@ -422,7 +399,7 @@ namespace ULR::Resolver
 	// }
 	Type* ULRAPIImpl::GetType(std::string_view full_qual_typename)
 	{
-		for (auto& entry : *assemblies) // optimize this somehow
+		for (auto& entry : loader->LoadedAssemblies) // optimize this somehow
 		{
 			auto& assembly = entry.second;
 
@@ -430,9 +407,9 @@ namespace ULR::Resolver
 		}
 
 		/* try to load assemblies until type is found */
-		for (auto& entry : *read_assemblies)
+		for (auto& entry : loader->ReadAssemblies)
 		{
-			if (assemblies->count(entry.first)) continue;
+			if (loader->LoadedAssemblies.count(entry.first)) continue;
 
 			if (!EnsureLoaded(entry.first)) continue;
 
@@ -453,9 +430,9 @@ namespace ULR::Resolver
 
 	Type* ULRAPIImpl::GetType(std::string_view full_qual_typename, std::string_view assembly_hint)
 	{
-		if (read_assemblies->count(assembly_hint) == 0 && assemblies->count(assembly_hint)) return nullptr;
+		if (loader->ReadAssemblies.count(assembly_hint) == 0 && loader->LoadedAssemblies.count(assembly_hint)) return nullptr;
 
-		auto& assembly = (*assemblies)[assembly_hint];
+		auto& assembly = (loader->LoadedAssemblies)[assembly_hint];
 		
 		if (assembly->types.count(full_qual_typename) != 0) return assembly->types[full_qual_typename];
 
@@ -697,7 +674,7 @@ namespace ULR::Resolver
 			}
 		}
 
-		for (auto& entry : *assemblies)
+		for (auto& entry : loader->LoadedAssemblies)
 		{
 			// add static roots to local var roots
 			for (auto& type_entry : entry.second->types)
@@ -784,12 +761,12 @@ namespace ULR::Resolver
 
 	Assembly* ULRAPIImpl::ResolveAddressToAssembly(void* addr)
 	{
-		for (auto& entry : *assemblies)
+		for (auto& entry : loader->LoadedAssemblies)
 		{
 			if (entry.second->handle == addr) return entry.second;
 		}
 		
-		for (auto& entry : *read_assemblies)
+		for (auto& entry : loader->ReadAssemblies)
 		{
 			if (entry.second->handle == addr) return entry.second;
 		}
@@ -799,7 +776,7 @@ namespace ULR::Resolver
 
 	MemberInfo* ULRAPIImpl::ResolveAddressToMember(void* addr)
 	{
-		for (auto& entry : *assemblies)
+		for (auto& entry : loader->LoadedAssemblies)
 		{
 			for (auto& type_entry : entry.second->types)
 			{

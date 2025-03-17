@@ -37,8 +37,8 @@ namespace ULR::IL
 			if (error) return error;
 		}
 
-		(*api->read_assemblies)[meta_asm->name] = meta_asm;
-		(*api->assemblies)[meta_asm->name] = meta_asm;
+		(api->loader->ReadAssemblies)[meta_asm->name] = meta_asm;
+		(api->loader->LoadedAssemblies)[meta_asm->name] = meta_asm;
 
 		i = 0;
 

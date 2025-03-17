@@ -12,15 +12,19 @@
 
 namespace ULR::Resolver { class ULRAPIImpl; }
 
-namespace ULR::Loader
+namespace ULR
 {
-	extern std::map<std::string_view, Assembly*> ReadAssemblies;
-	extern std::map<std::string_view, Assembly*> LoadedAssemblies;
-	extern std::vector<GenericPlaceholder*> alloced_generic_placeholders;
+	class Loader
+	{	
+		public:
+			std::map<std::string_view, Assembly*> ReadAssemblies;
+			std::map<std::string_view, Assembly*> LoadedAssemblies;
+			std::vector<GenericPlaceholder*> alloced_generic_placeholders;
 
-	ULRResult<HMODULE> ReadNativeAssembly(const char* dll);
-	ULRResult<Assembly*> LoadNativeAssembly(const char* dll, Resolver::ULRAPIImpl* api);
-	ULRResult<Type*> GetType(std::string_view qual_name);
-	ULRResult<std::vector<Type*>> ParseArgs(size_t* i, char* meta);
-	void PopulateVtable(Type* type);
+			ULRResult<HMODULE> ReadNativeAssembly(const char* dll);
+			ULRResult<Assembly*> LoadNativeAssembly(const char* dll, Resolver::ULRAPIImpl* api);
+			ULRResult<Type*> GetType(std::string_view qual_name);
+			ULRResult<std::vector<Type*>> ParseArgs(size_t* i, char* meta);
+			void PopulateVtable(Type* type);
+	};
 }

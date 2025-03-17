@@ -14,7 +14,7 @@ void overload0_ns0_Program_ctor(char* self) {}
 
 sizeof_ns1_System_Int32 overload0_ns0_Program_Main(char* argv)
 {
-	Assembly* jitasm = internal_api->LoadJITAssembly("/Users/carlf/programs/ulrproject/runtime/Tests/LoadJITAsm/adder.uil.ulas");
+	internal_api->LoadJITAssembly("/Users/carlf/programs/ulrproject/runtime/Tests/LoadJITAsm/adder.uil.ulas");
 
 	Type* Int32Type = internal_api->GetType("[System]Int32");
 

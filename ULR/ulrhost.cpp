@@ -27,7 +27,7 @@ ULRResult<char*> generate_ulr_argv(int argc, char* argv[])
 		ulr_args[i] = special_string_MAKE_FROM_LITERAL(argv[i+1], strlen(argv[i+1]));
 	}
 
-	auto res = Loader::GetType("[System]String[]");
+	auto res = internal_api->loader->GetType("[System]String[]");
 
 	if (res.error) return { nullptr, res.error };
 
@@ -53,6 +53,7 @@ struct HostingResult // this implementation is not exposed to the caller of Host
 	ULRInternalError error;
 };
 
+
 extern "C" HostingResult HostNativeAssembly(
 	char* assembly_name,
 	char* debugger_path,
@@ -63,7 +64,7 @@ extern "C" HostingResult HostNativeAssembly(
 {
 	std::signal(SIGSEGV, handle_access_violation);
 
-	HMODULE debugger = LoadLibraryA(debugger_path); // TODO: grab from cli args
+	HMODULE debugger = LoadLibraryA(debugger_path);
 
 	if (!debugger)
 	{
@@ -72,12 +73,7 @@ extern "C" HostingResult HostNativeAssembly(
 
 	bool debugger_successfully_loaded;
 
-	ULRAPIImpl lclapi = ULRAPIImpl( // perhaps refactor Loader into an object someday
-		&Loader::LoadedAssemblies,
-		&Loader::ReadAssemblies,
-		Loader::ReadNativeAssembly,
-		Loader::LoadNativeAssembly,
-		Loader::PopulateVtable,
+	ULRAPIImpl lclapi = ULRAPIImpl(
 		debugger,
 		debugger_successfully_loaded
 	);
@@ -89,24 +85,24 @@ extern "C" HostingResult HostNativeAssembly(
 	internal_api = &lclapi;
 
 	Assembly* ArrayTypeAssembly = new Assembly(strdup("ULR.<ArrayTypes>"), strdup(""), "", 0, { }, { nullptr }, (HMODULE) nullptr);
-	Loader::ReadAssemblies[ArrayTypeAssembly->name] = ArrayTypeAssembly;
-	Loader::LoadedAssemblies[ArrayTypeAssembly->name] = ArrayTypeAssembly;
+	lclapi.loader->ReadAssemblies[ArrayTypeAssembly->name] = ArrayTypeAssembly;
+	lclapi.loader->LoadedAssemblies[ArrayTypeAssembly->name] = ArrayTypeAssembly;
 	
 	/* Load Stdlib*/
 	
-	Loader::ReadNativeAssembly(stdlib_path);
+	lclapi.loader->ReadNativeAssembly(stdlib_path);
 
-	auto res = Loader::LoadNativeAssembly(stdlib_path, &lclapi);
+	auto res = lclapi.loader->LoadNativeAssembly(stdlib_path, &lclapi);
 
-	if (res.error) return { 0, res.error }; // TODO: this and below may actually cause leaks, have a ULRCleanup function which is called before returning (could be done by wrapper function)
+	if (res.error) return { 0, res.error };
 
 	Assembly* stdlibasm = res.result;
 
 	/* Load Main Assembly */
 
-	Loader::ReadNativeAssembly(assembly_name);
+	lclapi.loader->ReadNativeAssembly(assembly_name);
 
-	res = Loader::LoadNativeAssembly(assembly_name, &lclapi);
+	res = lclapi.loader->LoadNativeAssembly(assembly_name, &lclapi);
 
 	if (res.error) return { 0, res.error };
 
@@ -134,38 +130,83 @@ extern "C" HostingResult HostNativeAssembly(
 
 	retcode = mainasm->entry(ulr_args_arr_obj);
 
+	return { retcode, None };
+}
+
+
+extern "C" HostingResult HostJITAssembly(
+	char* assembly_name,
+	char* debugger_path,
+	char* stdlib_path,
+	int argc_full,
+	char** argv_full
+)
+{
+	std::signal(SIGSEGV, handle_access_violation);
+
+	HMODULE debugger = LoadLibraryA(debugger_path);
+
+	if (!debugger)
+	{
+		return { 0, DebuggerNotFound };
+	}
+
+	bool debugger_successfully_loaded;
+
+	ULRAPIImpl lclapi = ULRAPIImpl(
+		debugger,
+		debugger_successfully_loaded
+	);
+
+	if (!debugger_successfully_loaded) return { 0, InvalidDebugger };
+
+	/* Initialize Internal Library */
+
+	internal_api = &lclapi;
+
+	Assembly* ArrayTypeAssembly = new Assembly(strdup("ULR.<ArrayTypes>"), strdup(""), "", 0, { }, { nullptr }, (HMODULE) nullptr);
+	lclapi.loader->ReadAssemblies[ArrayTypeAssembly->name] = ArrayTypeAssembly;
+	lclapi.loader->LoadedAssemblies[ArrayTypeAssembly->name] = ArrayTypeAssembly;
 	
-	// Final deallocation and cleanup (of ULR objects and the allocated assemblies)
+	/* Load Stdlib*/
+	
+	lclapi.loader->ReadNativeAssembly(stdlib_path);
 
-	for (auto& entry : lclapi.allocated_objs)
-	{		
-		free(entry.first);
-	}
+	auto res = lclapi.loader->LoadNativeAssembly(stdlib_path, &lclapi);
 
-	lclapi.allocated_size = 0;
+	if (res.error) return { 0, res.error };
 
-	for (void* ptr : lclapi.allocated_field_offsets)
+	Assembly* stdlibasm = res.result;
+
+	/* Load Main Assembly */
+
+	auto jit_res = lclapi.LoadJITAssembly(assembly_name);
+
+	if (jit_res.error) { return { 0, jit_res.error }; }
+
+	Assembly* mainasm = jit_res.result;
+
+	if (mainasm->entry == nullptr)
 	{
-		free(ptr);
+		return { 0, EntryPointNotFound };
 	}
 
-	std::set<Assembly*> allocated_asms;
+	/* Initialize string[] args / argv */
 
-	for (auto& entry : Loader::ReadAssemblies) allocated_asms.emplace(entry.second);
-	for (auto& entry : Loader::LoadedAssemblies) allocated_asms.emplace(entry.second);
+	special_string_MAKE_FROM_LITERAL = (char* (*)(char*, int)) lclapi.LocateSymbol(stdlibasm, "special_string_MAKE_FROM_LITERAL");
+	special_array_from_ptr = (char* (*)(void*, int, Type*)) lclapi.LocateSymbol(stdlibasm, "special_array_from_ptr");
+	
+	auto args_res = generate_ulr_argv(argc_full, argv_full);
 
-	for (auto allocated_assembly : allocated_asms)
-	{
-		delete allocated_assembly;
-	}
+	if (args_res.error) return { 0, args_res.error };
 
-	for (auto placeholder : Loader::alloced_generic_placeholders)
-	{
-		delete placeholder;
-	}
+	char* ulr_args_arr_obj = args_res.result;
 
-	FreeLibrary(debugger);
-	SymCleanup(GetCurrentProcess());
+	int retcode;
+	
+	lclapi.InitGCLocalVarRoot((char**) &retcode);
+
+	retcode = mainasm->entry(ulr_args_arr_obj);
 
 	return { retcode, None };
 }
